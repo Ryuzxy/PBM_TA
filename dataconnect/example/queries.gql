@@ -1,0 +1,89 @@
+query ListAllPackages @auth(level: USER, insecureReason: "This operation is safe to expose to all logged in users.") {
+  packages {
+    id
+    trackingNumber
+    status
+    type
+    owner {
+      displayName
+      email
+    }
+    senderAddress {
+      street
+      city
+      state
+      zipCode
+    }
+    recipientAddress {
+      street
+      city
+      state
+      zipCode
+    }
+  }
+}
+
+query GetPackageDetails($id: UUID!) @auth(level: USER) {
+  package(id: $id) {
+    id
+    trackingNumber
+    type
+    status
+    description
+    carrier
+    createdAt
+    updatedAt
+    expectedDeliveryDate
+    pickupScheduledDate
+    owner {
+      id
+      displayName
+      email
+    }
+    senderAddress {
+      id
+      label
+      street
+      city
+      state
+      zipCode
+      country
+    }
+    recipientAddress {
+      id
+      label
+      street
+      city
+      state
+      zipCode
+      country
+    }
+    trackingUpdates(orderBy: [{timestamp: DESC}]) {
+      timestamp
+      status
+      location
+      description
+    }
+    courierInteractions(orderBy: [{timestamp: DESC}]) {
+      timestamp
+      type
+      status
+      message
+      initiator {
+        displayName
+      }
+    }
+  }
+}
+
+mutation CreateNewPackage($data: Package_Data!) @auth(level: USER) {
+  package_insert(data: $data) {
+    id
+  }
+}
+
+mutation UpdatePackageStatus($id: UUID!, $newStatus: String!) @auth(level: USER) {
+  package_update(id: $id, data: {status: $newStatus, updatedAt_expr: "request.time"}) {
+    id
+  }
+}

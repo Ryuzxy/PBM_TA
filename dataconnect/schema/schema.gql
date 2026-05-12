@@ -1,0 +1,55 @@
+type User @table {
+  authId: String!
+  displayName: String!
+  email: String!
+  createdAt: Timestamp!
+  phoneNumber: String
+  photoUrl: String
+}
+
+type Address @table {
+  user: User
+  street: String!
+  city: String!
+  state: String!
+  zipCode: String!
+  country: String!
+  createdAt: Timestamp!
+  apartmentNumber: String
+  label: String
+}
+
+type Package @table {
+  owner: User
+  senderAddress: Address
+  recipientAddress: Address
+  trackingNumber: String!
+  type: String!
+  status: String!
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+  description: String
+  senderName: String
+  recipientName: String
+  carrier: String
+  expectedDeliveryDate: Date
+  pickupScheduledDate: Date
+}
+
+type TrackingUpdate @table {
+  package: Package
+  timestamp: Timestamp!
+  status: String!
+  location: String!
+  description: String
+}
+
+type CourierInteraction @table {
+  package: Package
+  initiator: User
+  timestamp: Timestamp!
+  type: String!
+  status: String!
+  message: String
+  courierId: UUID
+}
