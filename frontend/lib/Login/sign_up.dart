@@ -1,8 +1,79 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'sign_in.dart';
 
-class SignUp extends StatelessWidget {
+class SignUp extends StatefulWidget {
   const SignUp({super.key});
+
+  @override
+  State<SignUp> createState() => _SignUpState();
+}
+
+class _SignUpState extends State<SignUp> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+  bool _isLoading = false;
+
+  Future<void> _handleSignUp() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all fields')),
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Account created successfully! Please log in.')),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const SignIn()),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message ?? 'An error occurred during sign up')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +97,7 @@ class SignUp extends StatelessWidget {
               ),
               const SizedBox(height: 40),
               TextField(
+                controller: _emailController,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: const Color(0xFFF3F3F3),
@@ -54,6 +126,7 @@ class SignUp extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               TextField(
+                controller: _passwordController,
                 obscureText: true,
                 decoration: InputDecoration(
                   filled: true,
@@ -84,6 +157,7 @@ class SignUp extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               TextField(
+                controller: _confirmPasswordController,
                 obscureText: true,
                 decoration: InputDecoration(
                   filled: true,
@@ -126,7 +200,7 @@ class SignUp extends StatelessWidget {
                       ),
                     ),
                     TextSpan(
-                      text: 'Register',
+                      text: 'Create',
                       style: TextStyle(
                         color: Color(0xFFFF4B26),
                         fontSize: 12,
@@ -148,9 +222,7 @@ class SignUp extends StatelessWidget {
               ),
               const SizedBox(height: 40),
               GestureDetector(
-                onTap: () {
-                  // TODO: Implement Sign Up Logic
-                },
+                onTap: _isLoading ? null : _handleSignUp,
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 20),
@@ -160,16 +232,22 @@ class SignUp extends StatelessWidget {
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
-                  child: const Text(
-                    'Create Account',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontFamily: 'Montserrat',
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Create Account',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 40),
@@ -248,4 +326,4 @@ class SignUp extends StatelessWidget {
       child: Icon(icon, color: const Color(0xFFF73658), size: 24),
     );
   }
-}
+}

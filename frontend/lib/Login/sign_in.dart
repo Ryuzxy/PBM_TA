@@ -1,9 +1,68 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'sign_up.dart';
 import 'forgot_pass.dart';
+import '../Buyer/search.dart';
 
-class SignIn extends StatelessWidget {
+class SignIn extends StatefulWidget {
   const SignIn({super.key});
+
+  @override
+  State<SignIn> createState() => _SignInState();
+}
+
+class _SignInState extends State<SignIn> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
+
+  Future<void> _handleLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter both email and password')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => TrendingProducts()),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message ?? 'An error occurred during login')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +86,7 @@ class SignIn extends StatelessWidget {
               ),
               const SizedBox(height: 40),
               TextField(
+                controller: _emailController,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: const Color(0xFFF3F3F3),
@@ -55,6 +115,7 @@ class SignIn extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               TextField(
+                controller: _passwordController,
                 obscureText: true,
                 decoration: InputDecoration(
                   filled: true,
@@ -106,9 +167,7 @@ class SignIn extends StatelessWidget {
               ),
               const SizedBox(height: 40),
               GestureDetector(
-                onTap: () {
-                  // TODO: Implement Login Logic
-                },
+                onTap: _isLoading ? null : _handleLogin,
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 20),
@@ -118,16 +177,22 @@ class SignIn extends StatelessWidget {
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
-                  child: const Text(
-                    'Login',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontFamily: 'Montserrat',
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Login',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 40),
@@ -206,4 +271,4 @@ class SignIn extends StatelessWidget {
       child: Icon(icon, color: const Color(0xFFF73658), size: 24),
     );
   }
-}
+}

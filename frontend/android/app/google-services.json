@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "171891372687",
+    "project_id": "smartdrop-55228",
+    "storage_bucket": "smartdrop-55228.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:171891372687:android:dfe2d31905e8b954a9f6fa",
+        "android_client_info": {
+          "package_name": "com.example.frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAm5iu-zPvpMuUD8-8BXRg4kqwgV_0OVHI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
