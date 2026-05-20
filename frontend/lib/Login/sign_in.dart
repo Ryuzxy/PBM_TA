@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'sign_up.dart';
 import 'forgot_pass.dart';
-import '../Buyer/search.dart';
+import '../Buyer/dashboard.dart';
 
 class SignIn extends StatefulWidget {
   const SignIn({super.key});
@@ -39,7 +39,7 @@ class _SignInState extends State<SignIn> {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => TrendingProducts()),
+          MaterialPageRoute(builder: (context) => const DashboardScreen()),
         );
       }
     } on FirebaseAuthException catch (e) {

@@ -9,14 +9,19 @@ class GetStarted extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
-          // Background Image
+          // Background Gradient
           Container(
             width: double.infinity,
             height: double.infinity,
             decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: NetworkImage("https://placehold.co/390x844"),
-                fit: BoxFit.cover,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1A0E6E),
+                  Color(0xFF3B26B7),
+                  Color(0xFF6A52D8),
+                ],
               ),
             ),
           ),
@@ -114,4 +119,4 @@ class GetStarted extends StatelessWidget {
       ),
     );
   }
-}
+}

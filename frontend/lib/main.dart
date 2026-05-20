@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'Splash/splash_1.dart';
-
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'Services/theme_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,13 +17,22 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'SmartDrop',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color.fromARGB(255, 18, 32, 47),
-      ),
-      home: const SplashScreen1(),
+    return ValueListenableBuilder<AppTheme>(
+      valueListenable: ThemeManager.currentTheme,
+      builder: (context, currentTheme, _) {
+        return MaterialApp(
+          title: 'SmartDrop',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            scaffoldBackgroundColor: currentTheme.bgColor,
+            primaryColor: currentTheme.accentColor,
+            brightness: currentTheme.bgColor.computeLuminance() > 0.5
+                ? Brightness.light
+                : Brightness.dark,
+          ),
+          home: const SplashScreen1(),
+        );
+      },
     );
   }
 }
