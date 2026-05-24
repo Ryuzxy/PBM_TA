@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'sign_up.dart';
 import 'forgot_pass.dart';
-import '../Buyer/dashboard.dart';
+import '../Buyer/dashboard/dashboard.dart';
+import '../Services/theme_manager.dart';
 
 class SignIn extends StatefulWidget {
   const SignIn({super.key});
@@ -36,6 +37,7 @@ class _SignInState extends State<SignIn> {
         email: email,
         password: password,
       );
+      await ThemeManager.loadTheme();
       if (mounted) {
         Navigator.pushReplacement(
           context,

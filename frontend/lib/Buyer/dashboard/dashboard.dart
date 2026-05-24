@@ -2,13 +2,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../Models/product.dart';
-import '../Models/category_model.dart';
-import '../Models/banner_model.dart';
-import '../Services/firestore_service.dart';
+import '../../Models/product.dart';
+import '../../Models/category_model.dart';
+import '../../Models/banner_model.dart';
+import '../../Services/firestore_service.dart';
 import 'profile.dart';
 import 'setting.dart';
-import '../Services/theme_manager.dart';
+import '../../Services/theme_manager.dart';
+import '../chekout/cart.dart';
+import 'wishlist.dart';
+import 'search.dart';
+import 'items_detail.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -21,11 +25,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final FirestoreService _firestoreService = FirestoreService();
   int _selectedIndex = 0;
 
-  // User profile
   String? _userPhotoUrl;
   String _userInitials = 'U';
 
-  // Banners loaded via stream
   List<BannerModel> _banners = [];
   StreamSubscription<List<BannerModel>>? _bannersSubscription;
 
@@ -51,18 +53,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // Inisialisasi dari email
     final email = user.email ?? '';
     if (email.isNotEmpty && mounted) {
       setState(() => _userInitials = email[0].toUpperCase());
     }
 
-    // Coba dari Firebase Auth photoURL
     if (user.photoURL != null && user.photoURL!.isNotEmpty) {
       if (mounted) setState(() => _userPhotoUrl = user.photoURL);
     }
 
-    // Ambil dari Firestore users collection
     try {
       final doc = await FirebaseFirestore.instance
           .collection('users')
@@ -73,7 +72,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         setState(() {
           final name = (data['accountHolder'] as String?) ?? '';
           if (name.isNotEmpty) _userInitials = name[0].toUpperCase();
-          final photoUrl = (data['photoURL'] as String?) ?? '';
+          final photoUrl = (data['photoUrl'] as String?) ?? '';
           if (photoUrl.isNotEmpty) _userPhotoUrl = photoUrl;
         });
       }
@@ -82,7 +81,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  /// Ambil banner berdasarkan tipe
   BannerModel? _getBanner(String type) {
     try {
       return _banners.firstWhere((b) => b.type == type);
@@ -91,7 +89,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  /// Widget gambar aman: menangani URL kosong & error dengan graceful fallback
   Widget _safeImage({
     required String url,
     double? height,
@@ -128,7 +125,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// Avatar profil: pakai foto dari Firebase, fallback ke inisial
   Widget _buildProfileAvatar(Color accentColor) {
     if (_userPhotoUrl != null && _userPhotoUrl!.isNotEmpty) {
       return CircleAvatar(
@@ -163,7 +159,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final accentColor = currentTheme.accentColor;
         final subTextColor = currentTheme.subTextColor;
 
-        // Ambil banner sesuai tipe
         final promoBanner = _getBanner('promo');
         final specialOfferBanner = _getBanner('special_offer');
         final flatHeelsBanner = _getBanner('flat_heels');
@@ -220,7 +215,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Search Bar ──────────────────────────────────────────────
               Container(
                 decoration: BoxDecoration(
                   color: cardColor,
@@ -248,7 +242,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 24),
 
-              // ── Categories Header ────────────────────────────────────────
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -271,7 +264,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 16),
 
-              // ── Categories dari Firestore ───────────────────────────────
               SizedBox(
                 height: 90,
                 child: StreamBuilder<List<CategoryModel>>(
@@ -281,7 +273,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     final isLoading = snapshot.connectionState == ConnectionState.waiting;
 
                     if (isLoading && categories.isEmpty) {
-                      // Skeleton shimmer sementara loading
                       return ListView.builder(
                         scrollDirection: Axis.horizontal,
                         itemCount: 5,
@@ -290,7 +281,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     }
 
                     if (categories.isEmpty) {
-                      // Fallback: kategori default dengan ikon
                       final defaults = [
                         ('Beauty', Icons.face_retouching_natural),
                         ('Fashion', Icons.checkroom),
@@ -318,7 +308,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 24),
 
-              // ── Promo Banner ────────────────────────────────────────────
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -383,7 +372,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Carousel dots
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -394,7 +382,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 24),
 
-              // ── Deal of the Day ─────────────────────────────────────────
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
@@ -447,7 +434,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 16),
 
-              // ── Products Horizontal (dari Firestore) ────────────────────
               SizedBox(
                 height: 260,
                 child: StreamBuilder<List<Product>>(
@@ -474,7 +460,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 24),
 
-              // ── Special Offers (dari Firestore) ─────────────────────────
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -525,7 +510,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 24),
 
-              // ── Flat and Heels Banner (dari Firestore) ──────────────────
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -588,7 +572,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 24),
 
-              // ── Trending Products Header ─────────────────────────────────
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
@@ -643,7 +626,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 16),
 
-              // ── Trending Products List (dari Firestore) ──────────────────
               SizedBox(
                 height: 260,
                 child: StreamBuilder<List<Product>>(
@@ -670,7 +652,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 24),
 
-              // ── Hot Summer Sale Banner (dari Firestore) ──────────────────
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: _safeImage(
@@ -721,7 +702,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 24),
 
-              // ── Sponsored (dari Firestore) ───────────────────────────────
               Text('Sponsored',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
@@ -791,13 +771,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
             backgroundColor: cardColor,
             showUnselectedLabels: true,
             onTap: (index) {
-              if (index == 4) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingScreen()),
-                );
-              } else {
-                setState(() => _selectedIndex = index);
+              switch (index) {
+                case 0:
+                  // Already on Home/Dashboard, do nothing
+                  setState(() => _selectedIndex = 0);
+                  break;
+                case 1:
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const WishlistScreen()));
+                  break;
+                case 2:
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const CartScreen()));
+                  break;
+                case 3:
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const SearchScreen()));
+                  break;
+                case 4:
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingScreen()));
+                  break;
               }
             },
             items: const [
@@ -805,7 +795,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               BottomNavigationBarItem(
                   icon: Icon(Icons.favorite_border), label: 'Wishlist'),
               BottomNavigationBarItem(
-                  icon: SizedBox.shrink(), label: ''), // Placeholder for FAB
+                  icon: SizedBox.shrink(), label: ''), 
               BottomNavigationBarItem(
                   icon: Icon(Icons.search), label: 'Search'),
               BottomNavigationBarItem(
@@ -816,10 +806,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             top: -20,
             left: MediaQuery.of(context).size.width / 2 - 28,
             child: FloatingActionButton(
-              backgroundColor: cardColor,
-              onPressed: () {},
-              elevation: 2,
-              child: Icon(Icons.shopping_cart_outlined, color: textColor),
+              backgroundColor: accentColor,
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CartScreen()),
+              ),
+              elevation: 4,
+              child: const Icon(Icons.shopping_cart_outlined, color: Colors.white),
             ),
           ),
         ],
@@ -828,8 +821,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       },
     );
   }
-
-  // ─── Helper Widgets ────────────────────────────────────────────────────────
 
   Widget _buildFilterChip(
       String label, IconData icon, Color textColor, Color cardColor) {
@@ -852,7 +843,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// Category item dari Firestore
   Widget _buildCategoryItem(
       CategoryModel category, Color textColor, Color accentColor) {
     return Padding(
@@ -879,7 +869,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// Category item default (jika Firestore kosong)
   Widget _buildDefaultCategoryItem(
       String name, IconData icon, Color textColor, Color accentColor) {
     return Padding(
@@ -898,7 +887,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  /// Skeleton shimmer saat loading categories
   Widget _buildCategoryShimmer(Color cardColor) {
     return Padding(
       padding: const EdgeInsets.only(right: 16.0),
@@ -932,102 +920,108 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildProductCard(Product product, AppTheme currentTheme) {
-    return Container(
-      width: 160,
-      margin: const EdgeInsets.only(right: 16),
-      decoration: BoxDecoration(
-        color: currentTheme.cardColor,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              spreadRadius: 1),
-        ],
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ItemDetailScreen(product: product)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(8),
-              topRight: Radius.circular(8),
+      child: Container(
+        width: 160,
+        margin: const EdgeInsets.only(right: 16),
+        decoration: BoxDecoration(
+          color: currentTheme.cardColor,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 4,
+                spreadRadius: 1),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(8),
+                topRight: Radius.circular(8),
+              ),
+              child: _safeImage(
+                url: product.imageUrl,
+                height: 120,
+                width: double.infinity,
+                bgColor: currentTheme.cardColor,
+                icon: Icons.shopping_bag_outlined,
+              ),
             ),
-            child: _safeImage(
-              url: product.imageUrl,
-              height: 120,
-              width: double.infinity,
-              bgColor: currentTheme.cardColor,
-              icon: Icons.shopping_bag_outlined,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.title,
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: currentTheme.textColor),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  product.description,
-                  style: TextStyle(
-                      fontSize: 10, color: currentTheme.subTextColor),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '₹${product.price.toStringAsFixed(0)}',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: currentTheme.textColor),
-                ),
-                if (product.oldPrice != null)
-                  Row(
-                    children: [
-                      Text(
-                        '₹${product.oldPrice!.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: currentTheme.subTextColor,
-                          decoration: TextDecoration.lineThrough,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      if (product.discount != null)
-                        Text(
-                          '${product.discount!.toStringAsFixed(0)}% off',
-                          style:
-                              const TextStyle(fontSize: 10, color: Colors.red),
-                        ),
-                    ],
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.title,
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: currentTheme.textColor),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                if (product.reviews > 0) ...[
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      const Icon(Icons.star, color: Colors.amber, size: 12),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${product.rating} (${product.reviews})',
-                        style: TextStyle(
-                            fontSize: 10, color: currentTheme.subTextColor),
-                      ),
-                    ],
+                  Text(
+                    product.description,
+                    style: TextStyle(
+                        fontSize: 10, color: currentTheme.subTextColor),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '₹${product.price.toStringAsFixed(0)}',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: currentTheme.accentColor),
+                  ),
+                  if (product.oldPrice != null)
+                    Row(
+                      children: [
+                        Text(
+                          '₹${product.oldPrice!.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: currentTheme.subTextColor,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        if (product.discount != null)
+                          Text(
+                            '${product.discount!.toStringAsFixed(0)}% off',
+                            style:
+                                const TextStyle(fontSize: 10, color: Colors.red),
+                          ),
+                      ],
+                    ),
+                  if (product.reviews > 0) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 12),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${product.rating} (${product.reviews})',
+                          style: TextStyle(
+                              fontSize: 10, color: currentTheme.subTextColor),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

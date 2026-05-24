@@ -9,6 +9,10 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  
+  // Memuat tema yang tersimpan
+  await ThemeManager.loadTheme(); 
+  
   runApp(const MyApp());
 }
 

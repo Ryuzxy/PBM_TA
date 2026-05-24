@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AppTheme {
   final String name;
@@ -56,11 +58,38 @@ class ThemeManager {
 
   static final ValueNotifier<AppTheme> currentTheme = ValueNotifier<AppTheme>(themes[0]);
 
-  static void changeTheme(String themeName) {
+  static String get _themeKey {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    return uid != null ? 'selected_theme_$uid' : 'selected_theme';
+  }
+
+  // Fungsi baru untuk memuat tema saat aplikasi dibuka
+  static Future<void> loadTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedThemeName = prefs.getString(_themeKey);
+    
+    if (savedThemeName != null) {
+      final theme = themes.firstWhere(
+        (t) => t.name == savedThemeName,
+        orElse: () => themes[0],
+      );
+      currentTheme.value = theme;
+    } else {
+      currentTheme.value = themes[0];
+    }
+  }
+
+  // Fungsi yang diperbarui untuk mengubah DAN menyimpan tema
+  static Future<void> changeTheme(String themeName) async {
     final theme = themes.firstWhere(
       (t) => t.name == themeName,
       orElse: () => themes[0],
     );
+    
     currentTheme.value = theme;
+    
+    // Simpan ke storage lokal
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_themeKey, themeName);
   }
 }

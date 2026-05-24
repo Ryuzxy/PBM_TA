@@ -12,6 +12,15 @@ class FirestoreService {
         snapshot.docs.map((doc) => Product.fromFirestore(doc)).toList());
   }
 
+  Stream<List<Product>> getProductsBySeller(String sellerId) {
+    return _db
+        .collection('products')
+        .where('sellerId', isEqualTo: sellerId)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Product.fromFirestore(doc)).toList());
+  }
+
   Future<void> addProduct(Product product) async {
     await _db.collection('products').add(product.toMap());
   }

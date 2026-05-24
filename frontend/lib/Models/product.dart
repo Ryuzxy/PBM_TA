@@ -10,6 +10,8 @@ class Product {
   final String imageUrl;
   final double rating;
   final int reviews;
+  final String? sellerId;
+  final String? sellerName;
 
   Product({
     this.id,
@@ -21,6 +23,8 @@ class Product {
     required this.imageUrl,
     this.rating = 0.0,
     this.reviews = 0,
+    this.sellerId,
+    this.sellerName,
   });
 
   factory Product.fromFirestore(DocumentSnapshot doc) {
@@ -30,11 +34,13 @@ class Product {
       title: data['title'] ?? '',
       description: data['description'] ?? '',
       price: (data['price'] ?? 0.0).toDouble(),
-      oldPrice: data['old_price'] != null ? data['old_price'].toDouble() : null,
+      oldPrice: data['oldPrice'] != null ? data['oldPrice'].toDouble() : null,
       discount: data['discount'] != null ? data['discount'].toDouble() : null,
-      imageUrl: data['image_url'] ?? '',
+      imageUrl: data['imageUrl'] ?? '',
       rating: (data['rating'] ?? 0.0).toDouble(),
       reviews: data['reviews'] ?? 0,
+      sellerId: data['sellerId'] as String?,
+      sellerName: data['sellerName'] as String?,
     );
   }
 
@@ -43,11 +49,13 @@ class Product {
       'title': title,
       'description': description,
       'price': price,
-      'old_price': oldPrice,
+      'oldPrice': oldPrice,
       'discount': discount,
-      'image_url': imageUrl,
+      'imageUrl': imageUrl,
       'rating': rating,
       'reviews': reviews,
+      'sellerId': sellerId,
+      'sellerName': sellerName,
     };
   }
 }
