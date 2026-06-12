@@ -215,52 +215,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      spreadRadius: 1,
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+              Text(
+                'All Featured',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: textColor,
+                  fontWeight: FontWeight.bold,
                 ),
-                child: TextField(
-                  style: TextStyle(color: textColor),
-                  decoration: InputDecoration(
-                    hintText: 'Search any Product..',
-                    hintStyle: TextStyle(color: subTextColor.withOpacity(0.6)),
-                    prefixIcon: Icon(Icons.search, color: subTextColor),
-                    suffixIcon: Icon(Icons.mic, color: subTextColor),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'All Featured',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: textColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      _buildFilterChip('Sort', Icons.swap_vert, textColor, cardColor),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Filter', Icons.filter_alt_outlined, textColor, cardColor),
-                    ],
-                  ),
-                ],
               ),
               const SizedBox(height: 16),
 
@@ -391,21 +352,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Column(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Deal of the Day',
+                        const Text('Deal of the Day',
                             style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16)),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Row(
                           children: [
-                            Icon(Icons.access_time, color: Colors.white, size: 14),
-                            SizedBox(width: 4),
-                            Text('22h 55m 20s remaining',
-                                style: TextStyle(color: Colors.white, fontSize: 12)),
+                            const Icon(Icons.access_time, color: Colors.white, size: 14),
+                            const SizedBox(width: 4),
+                            StreamBuilder<DocumentSnapshot>(
+                              stream: _firestoreService.getSettings('deals_of_days'),
+                              builder: (context, snapshot) {
+                                final data = snapshot.data?.data() as Map<String, dynamic>?;
+                                final remainingText = data != null ? (data['remainingText'] as String? ?? 'No deal') : 'Loading...';
+                                return Text(
+                                  remainingText,
+                                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                                );
+                              },
+                            ),
                           ],
                         ),
                       ],
@@ -435,9 +405,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 16),
 
               SizedBox(
-                height: 260,
+                height: 315,
                 child: StreamBuilder<List<Product>>(
-                  stream: _firestoreService.getProducts(),
+                  stream: _firestoreService.getDealProducts(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
@@ -581,23 +551,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Column(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Trending Products',
+                        const Text('Trending Products',
                             style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16)),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Row(
                           children: [
-                            Icon(Icons.calendar_today,
+                            const Icon(Icons.calendar_today,
                                 color: Colors.white, size: 14),
-                            SizedBox(width: 4),
-                            Text('Last Date 29/02/22',
-                                style:
-                                    TextStyle(color: Colors.white, fontSize: 12)),
+                            const SizedBox(width: 4),
+                            StreamBuilder<DocumentSnapshot>(
+                              stream: _firestoreService.getSettings('trending'),
+                              builder: (context, snapshot) {
+                                final data = snapshot.data?.data() as Map<String, dynamic>?;
+                                final lastDate = data != null ? (data['lastDate'] as String? ?? '') : 'Loading...';
+                                return Text(
+                                  lastDate,
+                                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                                );
+                              },
+                            ),
                           ],
                         ),
                       ],
@@ -627,9 +605,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const SizedBox(height: 16),
 
               SizedBox(
-                height: 260,
+                height: 315,
                 child: StreamBuilder<List<Product>>(
-                  stream: _firestoreService.getProducts(),
+                  stream: _firestoreService.getTrendingProducts(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
@@ -699,6 +677,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 24),
+
+              SizedBox(
+                height: 315,
+                child: StreamBuilder<List<Product>>(
+                  stream: _firestoreService.getNewArrivalProducts(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return const Center(child: Text('Error loading products'));
+                    }
+                    final products = snapshot.data ?? [];
+                    if (products.isEmpty) {
+                      return const Center(child: Text('No products available'));
+                    }
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: products.length,
+                      itemBuilder: (context, index) =>
+                          _buildProductCard(products[index], currentTheme),
+                    );
+                  },
+                ),
               ),
               const SizedBox(height: 24),
 
@@ -941,18 +945,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(8),
-                topRight: Radius.circular(8),
-              ),
-              child: _safeImage(
-                url: product.imageUrl,
-                height: 120,
-                width: double.infinity,
-                bgColor: currentTheme.cardColor,
-                icon: Icons.shopping_bag_outlined,
-              ),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(8),
+                    topRight: Radius.circular(8),
+                  ),
+                  child: _safeImage(
+                    url: product.imageUrl,
+                    height: 120,
+                    width: double.infinity,
+                    bgColor: currentTheme.cardColor,
+                    icon: Icons.shopping_bag_outlined,
+                  ),
+                ),
+                if (product.stock <= 0)
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(8),
+                        topRight: Radius.circular(8),
+                      ),
+                      child: Container(
+                        color: Colors.black.withOpacity(0.55),
+                        alignment: Alignment.center,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade700,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'SOLD OUT',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontFamily: 'Montserrat',
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             Padding(
               padding: const EdgeInsets.all(8.0),
@@ -975,9 +1013,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on_outlined, size: 10, color: currentTheme.subTextColor),
+                      const SizedBox(width: 2),
+                      Expanded(
+                        child: Text(
+                          product.location != null && product.location!.isNotEmpty
+                              ? product.location!
+                              : 'Official Store',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: currentTheme.subTextColor,
+                            fontFamily: 'Montserrat',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.inventory_2_outlined, size: 10, color: product.stock <= 0 ? Colors.red : currentTheme.subTextColor),
+                      const SizedBox(width: 2),
+                      Expanded(
+                        child: Text(
+                          product.stock <= 0 ? 'Stok Habis' : 'Stock: ${product.stock}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: product.stock <= 0 ? Colors.red : currentTheme.subTextColor,
+                            fontFamily: 'Montserrat',
+                            fontWeight: product.stock <= 0 ? FontWeight.bold : FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
                   Text(
-                    '₹${product.price.toStringAsFixed(0)}',
+                    'Rp ${product.price.toStringAsFixed(0)}',
                     style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
@@ -987,7 +1066,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Row(
                       children: [
                         Text(
-                          '₹${product.oldPrice!.toStringAsFixed(0)}',
+                          'Rp ${product.oldPrice!.toStringAsFixed(0)}',
                           style: TextStyle(
                             fontSize: 10,
                             color: currentTheme.subTextColor,

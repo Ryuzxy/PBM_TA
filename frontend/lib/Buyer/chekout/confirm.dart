@@ -90,6 +90,32 @@ class _ConfirmScreenState extends State<ConfirmScreen> with TickerProviderStateM
     }
   }
 
+  Widget _buildSummaryItem(String title, double amount, Color color, {bool isTotal = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: color,
+            fontFamily: 'Montserrat',
+            fontWeight: FontWeight.w500,
+            fontSize: 18,
+          ),
+        ),
+        Text(
+          'Rp ${amount.toStringAsFixed(0)}',
+          style: TextStyle(
+            color: color,
+            fontFamily: 'Montserrat',
+            fontWeight: isTotal ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 18,
+          ),
+        ),
+      ],
+    );
+  }
+
   void _showEditAddressDialog(BuildContext context, Color cardColor, Color textColor, Color accentColor) {
     final textController = TextEditingController(text: _deliveryAddress == 'Tap to choose your location' ? '' : _deliveryAddress);
     showDialog(
@@ -331,24 +357,14 @@ class _ConfirmScreenState extends State<ConfirmScreen> with TickerProviderStateM
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.currency_rupee,
-                              size: 24,
-                              color: textColor,
-                            ),
-                            Text(
-                              widget.totalAmount.toStringAsFixed(0),
-                              style: TextStyle(
-                                fontFamily: 'Montserrat',
-                                fontWeight: FontWeight.bold,
-                                fontSize: 28,
-                                color: textColor,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          'Rp ${widget.totalAmount.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 28,
+                            color: textColor,
+                          ),
                         ),
                       ],
                     ),
@@ -367,7 +383,7 @@ class _ConfirmScreenState extends State<ConfirmScreen> with TickerProviderStateM
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Compatible with Google Pay, PhonePe, Paytm, etc.',
+                    'Compatible with GoPay, OVO, Dana, LinkAja, Mobile Banking, dll.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: 'Montserrat',

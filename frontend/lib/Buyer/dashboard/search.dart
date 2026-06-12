@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 import '../../Models/product.dart';
 import '../../Services/firestore_service.dart';
 import '../../Services/theme_manager.dart';
@@ -24,6 +25,11 @@ class _SearchScreenState extends State<SearchScreen> {
   String _query = '';
   SortOption _sortOption = SortOption.none;
 
+  final SpeechToText _speechToText = SpeechToText();
+  bool _speechEnabled = false;
+  bool _isListening = false;
+  String _lastWords = '';
+
   // Filter
   double _minPrice = 0;
   double _maxPrice = 999999;
@@ -44,6 +50,167 @@ class _SearchScreenState extends State<SearchScreen> {
       setState(() => _query = _searchController.text.toLowerCase().trim());
     });
     _fetchUserLocation();
+    _initSpeech();
+  }
+
+  void _initSpeech() async {
+    try {
+      _speechEnabled = await _speechToText.initialize(
+        onStatus: (status) {
+          debugPrint('Speech status: $status');
+          if (status == 'done' || status == 'notListening') {
+            setState(() => _isListening = false);
+          }
+        },
+        onError: (error) {
+          debugPrint('Speech error: $error');
+          setState(() => _isListening = false);
+        },
+      );
+      setState(() {});
+    } catch (e) {
+      debugPrint('Error initializing speech: $e');
+    }
+  }
+
+  void _startListening(StateSetter setDialogState) async {
+    await _speechToText.listen(
+      onResult: (result) {
+        setDialogState(() {
+          _lastWords = result.recognizedWords;
+        });
+        setState(() {
+          _searchController.text = _lastWords;
+        });
+      },
+    );
+    setState(() => _isListening = true);
+  }
+
+  void _stopListening(StateSetter setDialogState) async {
+    await _speechToText.stop();
+    setState(() => _isListening = false);
+  }
+
+  void _showVoiceSearchDialog(Color cardColor, Color textColor, Color accentColor, Color subTextColor) {
+    _lastWords = '';
+    if (!_speechEnabled) {
+      _initSpeech();
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Start listening automatically when dialog opens
+            if (!_isListening && _speechEnabled) {
+              _startListening(setDialogState);
+            }
+
+            return AlertDialog(
+              backgroundColor: cardColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 16),
+                  Text(
+                    _isListening ? 'Mendengarkan...' : 'Ketuk mikrofon untuk mulai berbicara',
+                    style: TextStyle(
+                      color: textColor,
+                      fontFamily: 'Montserrat',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 28),
+                  GestureDetector(
+                    onTap: () {
+                      if (_isListening) {
+                        _speechToText.stop();
+                        setDialogState(() {
+                          _isListening = false;
+                        });
+                        setState(() {
+                          _isListening = false;
+                        });
+                      } else {
+                        _startListening(setDialogState);
+                        setDialogState(() {
+                          _isListening = true;
+                        });
+                        setState(() {
+                          _isListening = true;
+                        });
+                      }
+                    },
+                    child: Container(
+                      width: 90,
+                      height: 90,
+                      decoration: BoxDecoration(
+                        color: _isListening ? accentColor.withOpacity(0.2) : subTextColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: 70,
+                          height: 70,
+                          decoration: BoxDecoration(
+                            color: _isListening ? accentColor : subTextColor.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            _isListening ? Icons.mic : Icons.mic_none,
+                            color: Colors.white,
+                            size: 36,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  if (_lastWords.isNotEmpty)
+                    Text(
+                      '"$_lastWords"',
+                      style: TextStyle(
+                        color: textColor,
+                        fontFamily: 'Montserrat',
+                        fontStyle: FontStyle.italic,
+                        fontSize: 15,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      _speechToText.stop();
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accentColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text(
+                      'Selesai',
+                      style: TextStyle(fontFamily: 'Montserrat', fontWeight: FontWeight.bold),
+                    ),
+                  )
+                ],
+              ),
+            );
+          },
+        );
+      },
+    ).then((_) {
+      _speechToText.stop();
+      setState(() {
+        _isListening = false;
+      });
+    });
   }
 
   @override
@@ -286,7 +453,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          '₹${tempMin.toInt()} – ₹${tempMax == maxProductPrice ? '∞' : tempMax.toInt()}',
+                          'Rp ${tempMin.toInt()} – Rp ${tempMax == maxProductPrice ? '∞' : tempMax.toInt()}',
                           style: TextStyle(
                             color: accentColor,
                             fontFamily: 'Montserrat',
@@ -318,9 +485,9 @@ class _SearchScreenState extends State<SearchScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('₹0', style: TextStyle(color: textColor, fontFamily: 'Montserrat', fontSize: 12)),
+                      Text('Rp 0', style: TextStyle(color: textColor, fontFamily: 'Montserrat', fontSize: 12)),
                       Text(
-                        '₹${maxProductPrice.toInt()}',
+                        'Rp ${maxProductPrice.toInt()}',
                         style: TextStyle(color: textColor, fontFamily: 'Montserrat', fontSize: 12),
                       ),
                     ],
@@ -500,7 +667,15 @@ class _SearchScreenState extends State<SearchScreen> {
                                     _searchFocus.unfocus();
                                   },
                                 )
-                              : Icon(Icons.mic_rounded, color: subTextColor),
+                              : IconButton(
+                                  icon: Icon(Icons.mic_rounded, color: subTextColor),
+                                  onPressed: () => _showVoiceSearchDialog(
+                                    cardColor,
+                                    textColor,
+                                    accentColor,
+                                    subTextColor,
+                                  ),
+                                ),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(vertical: 14),
                         ),
@@ -577,7 +752,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           Icon(Icons.filter_alt_rounded, size: 14, color: accentColor),
                           const SizedBox(width: 6),
                           Text(
-                            'Price: ₹${_minPrice.toInt()} – ₹${_maxPrice >= 999999 ? '∞' : _maxPrice.toInt()}',
+                            'Price: Rp ${_minPrice.toInt()} – Rp ${_maxPrice >= 999999 ? '∞' : _maxPrice.toInt()}',
                             style: TextStyle(
                               color: accentColor,
                               fontFamily: 'Montserrat',
@@ -614,7 +789,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                       crossAxisCount: 2,
                                       crossAxisSpacing: 12,
                                       mainAxisSpacing: 12,
-                                      childAspectRatio: 0.68,
+                                      childAspectRatio: 0.57,
                                     ),
                                     itemCount: displayed.length,
                                     itemBuilder: (_, i) => _buildProductCard(
@@ -798,6 +973,33 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ),
                   ),
+                if (product.stock <= 0)
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                      child: Container(
+                        color: Colors.black.withOpacity(0.55),
+                        alignment: Alignment.center,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade700,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'SOLD OUT',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontFamily: 'Montserrat',
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
             // Details
@@ -819,12 +1021,53 @@ class _SearchScreenState extends State<SearchScreen> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on_outlined, size: 10, color: subTextColor),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: Text(
+                            product.location != null && product.location!.isNotEmpty
+                                ? product.location!
+                                : 'Official Store',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: subTextColor,
+                              fontFamily: 'Montserrat',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.inventory_2_outlined, size: 10, color: product.stock <= 0 ? Colors.red : subTextColor),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: Text(
+                            product.stock <= 0 ? 'Stok Habis' : 'Stock: ${product.stock}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: product.stock <= 0 ? Colors.red : subTextColor,
+                              fontFamily: 'Montserrat',
+                              fontWeight: product.stock <= 0 ? FontWeight.bold : FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                     const Spacer(),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '₹${product.price.toStringAsFixed(0)}',
+                          'Rp ${product.price.toStringAsFixed(0)}',
                           style: TextStyle(
                             color: accentColor,
                             fontFamily: 'Montserrat',

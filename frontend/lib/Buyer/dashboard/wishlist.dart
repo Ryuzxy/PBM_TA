@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../Services/theme_manager.dart';
 import '../../Models/product.dart';
+import 'items_detail.dart';
 
 class WishlistScreen extends StatefulWidget {
   const WishlistScreen({super.key});
@@ -206,7 +207,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.72,
+        childAspectRatio: 0.57,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
@@ -225,152 +226,198 @@ class _WishlistScreenState extends State<WishlistScreen> {
     Color accentColor,
     Color subTextColor,
   ) {
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ItemDetailScreen(product: product)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Image area
-          Stack(
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                child: product.imageUrl.isNotEmpty
-                    ? Image.network(
-                        product.imageUrl,
-                        height: 140,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _imageFallback(140, cardColor),
-                      )
-                    : _imageFallback(140, cardColor),
-              ),
-              // Remove from wishlist button
-              Positioned(
-                top: 8,
-                right: 8,
-                child: GestureDetector(
-                  onTap: () => _removeFromWishlist(product.id ?? ''),
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.12),
-                          blurRadius: 6,
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      Icons.favorite_rounded,
-                      color: accentColor,
-                      size: 18,
-                    ),
-                  ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image area
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  child: product.imageUrl.isNotEmpty
+                      ? Image.network(
+                          product.imageUrl,
+                          height: 140,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _imageFallback(140, cardColor),
+                        )
+                      : _imageFallback(140, cardColor),
                 ),
-              ),
-              // Discount badge
-              if (product.discount != null && product.discount! > 0)
+                // Remove from wishlist button
                 Positioned(
                   top: 8,
-                  left: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: accentColor,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      '-${product.discount!.toInt()}%',
-                      style: const TextStyle(
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: () => _removeFromWishlist(product.id ?? ''),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
                         color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 6,
+                          ),
+                        ],
                       ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          // Details
-          Padding(
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.title,
-                  style: TextStyle(
-                    color: textColor,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Text(
-                      '₹${product.price.toStringAsFixed(0)}',
-                      style: TextStyle(
+                      child: Icon(
+                        Icons.favorite_rounded,
                         color: accentColor,
-                        fontFamily: 'Montserrat',
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                        size: 18,
                       ),
                     ),
-                    if (product.oldPrice != null) ...[
-                      const SizedBox(width: 6),
-                      Text(
-                        '₹${product.oldPrice!.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          color: subTextColor,
-                          fontFamily: 'Montserrat',
-                          fontSize: 11,
-                          decoration: TextDecoration.lineThrough,
+                  ),
+                ),
+                // Discount badge
+                if (product.discount != null && product.discount! > 0)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: accentColor,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '-${product.discount!.toInt()}%',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            // Details
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.title,
+                    style: TextStyle(
+                      color: textColor,
+                      fontFamily: 'Montserrat',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on_outlined, size: 10, color: subTextColor),
+                      const SizedBox(width: 2),
+                      Expanded(
+                        child: Text(
+                          product.location != null && product.location!.isNotEmpty
+                              ? product.location!
+                              : 'Official Store',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: subTextColor,
+                            fontFamily: 'Montserrat',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
-                    const SizedBox(width: 2),
-                    Text(
-                      product.rating.toStringAsFixed(1),
-                      style: TextStyle(
-                        color: subTextColor,
-                        fontSize: 11,
-                        fontFamily: 'Montserrat',
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.inventory_2_outlined, size: 10, color: subTextColor),
+                      const SizedBox(width: 2),
+                      Expanded(
+                        child: Text(
+                          'Stock: ${product.stock}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: subTextColor,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Text(
+                        'Rp ${product.price.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          color: accentColor,
+                          fontFamily: 'Montserrat',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      if (product.oldPrice != null) ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          'Rp ${product.oldPrice!.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            color: subTextColor,
+                            fontFamily: 'Montserrat',
+                            fontSize: 11,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
+                      const SizedBox(width: 2),
+                      Text(
+                        product.rating.toStringAsFixed(1),
+                        style: TextStyle(
+                          color: subTextColor,
+                          fontSize: 11,
+                          fontFamily: 'Montserrat',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  /// Fallback when products aren't in Firestore yet — show placeholder cards from wishlist metadata
   Widget _buildWishlistFallback(
     List<QueryDocumentSnapshot> wishlistDocs,
     Color textColor,
@@ -382,7 +429,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.72,
+        childAspectRatio: 0.57,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
@@ -393,88 +440,107 @@ class _WishlistScreenState extends State<WishlistScreen> {
         final price = (data['price'] as num?)?.toDouble() ?? 0.0;
         final imageUrl = data['imageUrl'] as String? ?? '';
 
-        return Container(
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
+        final product = Product(
+          id: wishlistDocs[index].id,
+          title: name,
+          description: data['description'] as String? ?? '',
+          price: price,
+          oldPrice: data['oldPrice'] != null ? (data['oldPrice'] as num).toDouble() : null,
+          imageUrl: imageUrl,
+          sellerId: data['sellerId'] as String?,
+          sellerName: data['sellerName'] as String?,
+          location: data['location'] as String?,
+          stock: data['stock'] != null ? (data['stock'] as num).toInt() : 10,
+        );
+
+        return GestureDetector(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => ItemDetailScreen(product: product)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                    child: imageUrl.isNotEmpty
-                        ? Image.network(
-                            imageUrl,
-                            height: 140,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _imageFallback(140, cardColor),
-                          )
-                        : _imageFallback(140, cardColor),
-                  ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: GestureDetector(
-                      onTap: () => _removeFromWishlist(wishlistDocs[index].id),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.12),
-                              blurRadius: 6,
-                            ),
-                          ],
-                        ),
-                        child: Icon(Icons.favorite_rounded, color: accentColor, size: 18),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: Container(
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Stack(
                   children: [
-                    Text(
-                      name,
-                      style: TextStyle(
-                        color: textColor,
-                        fontFamily: 'Montserrat',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                      child: imageUrl.isNotEmpty
+                          ? Image.network(
+                              imageUrl,
+                              height: 140,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _imageFallback(140, cardColor),
+                            )
+                          : _imageFallback(140, cardColor),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      price > 0 ? '₹${price.toStringAsFixed(0)}' : 'Price TBD',
-                      style: TextStyle(
-                        color: accentColor,
-                        fontFamily: 'Montserrat',
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: GestureDetector(
+                        onTap: () => _removeFromWishlist(wishlistDocs[index].id),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.12),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                          child: Icon(Icons.favorite_rounded, color: accentColor, size: 18),
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
+                Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(
+                          color: textColor,
+                          fontFamily: 'Montserrat',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        price > 0 ? 'Rp ${price.toStringAsFixed(0)}' : 'Price TBD',
+                        style: TextStyle(
+                          color: accentColor,
+                          fontFamily: 'Montserrat',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },

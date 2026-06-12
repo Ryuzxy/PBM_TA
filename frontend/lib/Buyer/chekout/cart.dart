@@ -27,6 +27,9 @@ class _CartScreenState extends State<CartScreen> {
   // Cart items
   List<Map<String, dynamic>> _cartItems = [];
   bool _isLoadingCart = true;
+  
+  // Stock tracking: productId -> current stock
+  Map<String, int> _productStocks = {};
 
   @override
   void initState() {
@@ -75,22 +78,67 @@ class _CartScreenState extends State<CartScreen> {
           .doc(user.uid)
           .collection('cart')
           .snapshots()
-          .listen((snap) {
+          .listen((snap) async {
         if (mounted) {
+          final items = snap.docs.map((d) {
+            final data = d.data();
+            data['cartDocId'] = d.id;
+            return data;
+          }).toList();
+          
           setState(() {
-            _cartItems = snap.docs.map((d) {
-              final data = d.data();
-              data['cartDocId'] = d.id;
-              return data;
-            }).toList();
+            _cartItems = items;
             _isLoadingCart = false;
           });
+          
+          // Load stock for all products in cart
+          await _loadProductStocks();
         }
       });
     } catch (e) {
       debugPrint('Error loading cart: $e');
       setState(() => _isLoadingCart = false);
     }
+  }
+
+  Future<void> _loadProductStocks() async {
+    final Map<String, int> stocks = {};
+    for (var item in _cartItems) {
+      final productId = item['productId'] as String?;
+      if (productId != null && productId.isNotEmpty) {
+        try {
+          final doc = await FirebaseFirestore.instance
+              .collection('products')
+              .doc(productId)
+              .get();
+          if (doc.exists && doc.data() != null) {
+            final data = doc.data()!;
+            final stock = (data['stock'] as num?)?.toInt() ?? 0;
+            stocks[productId] = stock;
+          } else {
+            stocks[productId] = 0; // Product doesn't exist
+          }
+        } catch (e) {
+          debugPrint('Error loading stock for $productId: $e');
+          stocks[productId] = 0;
+        }
+      }
+    }
+    if (mounted) {
+      setState(() {
+        _productStocks = stocks;
+      });
+    }
+  }
+
+  bool get _hasOutOfStockItems {
+    for (var item in _cartItems) {
+      final productId = item['productId'] as String?;
+      if (productId != null && _productStocks.containsKey(productId)) {
+        if (_productStocks[productId]! <= 0) return true;
+      }
+    }
+    return false;
   }
 
   Future<void> _removeCartItem(String cartDocId) async {
@@ -104,13 +152,29 @@ class _CartScreenState extends State<CartScreen> {
         .delete();
   }
 
-  Future<void> _updateQuantity(String cartDocId, int delta, int currentQty) async {
+  Future<void> _updateQuantity(String cartDocId, int delta, int currentQty, {String? productId}) async {
     final newQty = currentQty + delta;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     if (newQty <= 0) {
       await _removeCartItem(cartDocId);
       return;
+    }
+    // Check stock limit when increasing
+    if (delta > 0 && productId != null && _productStocks.containsKey(productId)) {
+      final stock = _productStocks[productId]!;
+      if (newQty > stock) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Stok tersedia hanya $stock'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
     }
     await FirebaseFirestore.instance
         .collection('users')
@@ -421,7 +485,7 @@ class _CartScreenState extends State<CartScreen> {
                               ),
                             ),
                             Text(
-                              '₹${_totalPrice.toStringAsFixed(0)}',
+                              'Rp ${_totalPrice.toStringAsFixed(0)}',
                               style: TextStyle(
                                 color: textColor,
                                 fontWeight: FontWeight.bold,
@@ -432,7 +496,7 @@ class _CartScreenState extends State<CartScreen> {
                           ],
                         ),
                         ElevatedButton(
-                          onPressed: _deliveryAddress == 'Tap to choose your location'
+                          onPressed: (_deliveryAddress == 'Tap to choose your location' || _hasOutOfStockItems)
                               ? null
                               : () {
                                   Navigator.push(
@@ -440,8 +504,8 @@ class _CartScreenState extends State<CartScreen> {
                                     MaterialPageRoute(
                                       builder: (_) => PaymentScreen(
                                         orderAmount: _totalPrice,
-                                        shippingAmount: 30.0,
-                                        totalAmount: _totalPrice + 30.0,
+                                        shippingAmount: 15000.0,
+                                        totalAmount: _totalPrice + 15000.0,
                                       ),
                                     ),
                                   );
@@ -487,6 +551,11 @@ class _CartScreenState extends State<CartScreen> {
     final qty = (item['quantity'] as num?)?.toInt() ?? 1;
     final oldPrice = (item['oldPrice'] as num?)?.toDouble();
     final cartDocId = item['cartDocId'] as String? ?? '';
+    final productId = item['productId'] as String?;
+    final stock = (productId != null && _productStocks.containsKey(productId))
+        ? _productStocks[productId]!
+        : -1; // -1 = unknown/loading
+    final isSoldOut = stock == 0;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -505,17 +574,48 @@ class _CartScreenState extends State<CartScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Product image
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: imageUrl.isNotEmpty
-                ? Image.network(
-                    imageUrl,
-                    width: 90,
-                    height: 90,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _imageFallback(cardColor),
-                  )
-                : _imageFallback(cardColor),
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: imageUrl.isNotEmpty
+                    ? Image.network(
+                        imageUrl,
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _imageFallback(cardColor),
+                      )
+                    : _imageFallback(cardColor),
+              ),
+              if (isSoldOut)
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      alignment: Alignment.center,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade700,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'SOLD OUT',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(width: 12),
           // Details
@@ -550,7 +650,7 @@ class _CartScreenState extends State<CartScreen> {
                 Row(
                   children: [
                     Text(
-                      '₹${price.toStringAsFixed(0)}',
+                      'Rp ${price.toStringAsFixed(0)}',
                       style: TextStyle(
                         color: accentColor,
                         fontFamily: 'Montserrat',
@@ -561,7 +661,7 @@ class _CartScreenState extends State<CartScreen> {
                     if (oldPrice != null) ...[
                       const SizedBox(width: 8),
                       Text(
-                        '₹${oldPrice.toStringAsFixed(0)}',
+                        'Rp ${oldPrice.toStringAsFixed(0)}',
                         style: TextStyle(
                           color: subTextColor,
                           fontFamily: 'Montserrat',
@@ -574,11 +674,29 @@ class _CartScreenState extends State<CartScreen> {
                 ),
                 const SizedBox(height: 10),
                 // Quantity control
+                if (isSoldOut)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'Stok Habis - Hapus dari keranjang',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontFamily: 'Montserrat',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                  )
+                else
                 Row(
                   children: [
                     _qtyButton(
                       icon: Icons.remove,
-                      onTap: () => _updateQuantity(cartDocId, -1, qty),
+                      onTap: () => _updateQuantity(cartDocId, -1, qty, productId: productId),
                       accentColor: accentColor,
                     ),
                     Padding(
@@ -595,12 +713,12 @@ class _CartScreenState extends State<CartScreen> {
                     ),
                     _qtyButton(
                       icon: Icons.add,
-                      onTap: () => _updateQuantity(cartDocId, 1, qty),
+                      onTap: () => _updateQuantity(cartDocId, 1, qty, productId: productId),
                       accentColor: accentColor,
                     ),
                     const Spacer(),
                     Text(
-                      'Subtotal: ₹${(price * qty).toStringAsFixed(0)}',
+                      'Subtotal: Rp ${(price * qty).toStringAsFixed(0)}',
                       style: TextStyle(
                         color: subTextColor,
                         fontFamily: 'Montserrat',

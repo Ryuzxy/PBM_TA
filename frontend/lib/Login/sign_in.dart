@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'sign_up.dart';
 import 'forgot_pass.dart';
 import '../Buyer/dashboard/dashboard.dart';
+import '../Admin/admin_dashboard.dart';
 import '../Services/theme_manager.dart';
+import '../Services/auth_service.dart';
 
 class SignIn extends StatefulWidget {
   const SignIn({super.key});
@@ -16,6 +19,8 @@ class _SignInState extends State<SignIn> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  final AuthService _authService = AuthService();
 
   Future<void> _handleLogin() async {
     final email = _emailController.text.trim();
@@ -33,21 +38,118 @@ class _SignInState extends State<SignIn> {
     });
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
-      await ThemeManager.loadTheme();
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const DashboardScreen()),
-        );
+
+      final user = userCredential.user;
+      if (user != null) {
+        final uId = user.uid;
+        final emailStr = user.email ?? '';
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(uId).get();
+
+        String role = 'buyer';
+        if (!userDoc.exists) {
+          role = emailStr.toLowerCase().endsWith('@admin.com') ? 'admin' : 'buyer';
+          await FirebaseFirestore.instance.collection('users').doc(uId).set({
+            'uid': uId,
+            'email': emailStr,
+            'role': role,
+            'createdAt': FieldValue.serverTimestamp(),
+            'accountHolder': emailStr.split('@')[0],
+          });
+        } else {
+          role = userDoc.data()?['role'] as String? ?? 'buyer';
+          // Ensure role is updated to admin if it's an @admin.com email
+          if (emailStr.toLowerCase().endsWith('@admin.com') && role != 'admin') {
+            role = 'admin';
+            await FirebaseFirestore.instance.collection('users').doc(uId).update({'role': 'admin'});
+          }
+        }
+
+        await ThemeManager.loadTheme();
+        if (mounted) {
+          if (role == 'admin' && emailStr.toLowerCase().endsWith('@admin.com')) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const AdminDashboard()),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const DashboardScreen()),
+            );
+          }
+        }
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.message ?? 'An error occurred during login')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final userCredential = await _authService.signInWithGoogle();
+      if (userCredential != null && userCredential.user != null) {
+        final user = userCredential.user!;
+        final uId = user.uid;
+        final emailStr = user.email ?? '';
+
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(uId).get();
+        if (!userDoc.exists) {
+          final role = emailStr.toLowerCase().endsWith('@admin.com') ? 'admin' : 'buyer';
+          await FirebaseFirestore.instance.collection('users').doc(uId).set({
+            'uid': uId,
+            'email': emailStr,
+            'role': role,
+            'createdAt': FieldValue.serverTimestamp(),
+            'accountHolder': user.displayName ?? emailStr.split('@')[0],
+            'photoUrl': user.photoURL ?? '',
+          });
+        } else {
+          final role = userDoc.data()?['role'] as String? ?? 'buyer';
+          if (emailStr.toLowerCase().endsWith('@admin.com') && role != 'admin') {
+            await FirebaseFirestore.instance.collection('users').doc(uId).update({'role': 'admin'});
+          }
+        }
+
+        final finalDoc = await FirebaseFirestore.instance.collection('users').doc(uId).get();
+        final finalRole = finalDoc.data()?['role'] as String? ?? 'buyer';
+
+        await ThemeManager.loadTheme();
+        if (mounted) {
+          if (finalRole == 'admin' && emailStr.toLowerCase().endsWith('@admin.com')) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const AdminDashboard()),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const DashboardScreen()),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Google Sign-In failed: $e')),
         );
       }
     } finally {
@@ -118,7 +220,7 @@ class _SignInState extends State<SignIn> {
               const SizedBox(height: 20),
               TextField(
                 controller: _passwordController,
-                obscureText: true,
+                obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: const Color(0xFFF3F3F3),
@@ -130,7 +232,19 @@ class _SignInState extends State<SignIn> {
                     fontWeight: FontWeight.w500,
                   ),
                   prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF676767)),
-                  suffixIcon: const Icon(Icons.visibility_off_outlined, color: Color(0xFF676767)),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: const Color(0xFF676767),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(color: Color(0xFFA8A8A9)),
@@ -213,7 +327,10 @@ class _SignInState extends State<SignIn> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _buildSocialButton(Icons.g_mobiledata), // Placeholder for Google
+                  _buildSocialButton(
+                    Icons.g_mobiledata,
+                    onTap: _isLoading ? null : _handleGoogleSignIn,
+                  ), // Placeholder for Google
                   const SizedBox(width: 20),
                   _buildSocialButton(Icons.apple), // Placeholder for Apple
                   const SizedBox(width: 20),
@@ -260,17 +377,20 @@ class _SignInState extends State<SignIn> {
     );
   }
 
-  Widget _buildSocialButton(IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: ShapeDecoration(
-        color: const Color(0xFFFBF3F5),
-        shape: RoundedRectangleBorder(
-          side: const BorderSide(width: 1, color: Color(0xFFF73658)),
-          borderRadius: BorderRadius.circular(50),
+  Widget _buildSocialButton(IconData icon, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(15),
+        decoration: ShapeDecoration(
+          color: const Color(0xFFFBF3F5),
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(width: 1, color: Color(0xFFF73658)),
+            borderRadius: BorderRadius.circular(50),
+          ),
         ),
+        child: Icon(icon, color: const Color(0xFFF73658), size: 24),
       ),
-      child: Icon(icon, color: const Color(0xFFF73658), size: 24),
     );
   }
 }

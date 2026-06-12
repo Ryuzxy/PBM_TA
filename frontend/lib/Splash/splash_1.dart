@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'splash_2.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../Buyer/dashboard/dashboard.dart';
+import '../Admin/admin_dashboard.dart';
 
 void main() {
   runApp(const FigmaToCodeApp());
@@ -65,13 +67,36 @@ class _SplashScreen1State extends State<SplashScreen1> with TickerProviderStateM
       CurvedAnimation(parent: _controller, curve: const Interval(0.75, 1.00, curve: Curves.easeInOut))
     );
 
-    Future.delayed(const Duration(seconds: 3), () {
+    Future.delayed(const Duration(seconds: 3), () async {
       if (mounted) {
-        if (FirebaseAuth.instance.currentUser != null) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const DashboardScreen()),
-          );
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          try {
+            final emailStr = currentUser.email ?? '';
+            final uId = currentUser.uid;
+            final userDoc = await FirebaseFirestore.instance.collection('users').doc(uId).get();
+            String role = 'buyer';
+            if (userDoc.exists) {
+              role = userDoc.data()?['role'] as String? ?? 'buyer';
+            }
+            if (role == 'admin' && emailStr.toLowerCase().endsWith('@admin.com')) {
+              if (mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AdminDashboard()),
+                );
+              }
+              return;
+            }
+          } catch (e) {
+            debugPrint('Error getting user role on splash: $e');
+          }
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const DashboardScreen()),
+            );
+          }
         } else {
           Navigator.pushReplacement(
             context,

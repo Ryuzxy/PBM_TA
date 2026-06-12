@@ -62,16 +62,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
                 child: Column(
                   children: [
-                    _buildSummaryRow('Order', '\$ 79.00'),
+                    _buildSummaryRow('Order', 'Rp 79.000'),
                     const SizedBox(height: 8),
-                    _buildSummaryRow('Delivery', '\$ 5.00'),
+                    _buildSummaryRow('Delivery', 'Rp 5.000'),
                     const SizedBox(height: 8),
-                    _buildSummaryRow('Tax', '\$ 2.50'),
+                    _buildSummaryRow('Tax', 'Rp 2.500'),
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 12.0),
                       child: Divider(height: 1, color: Colors.grey),
                     ),
-                    _buildSummaryRow('Total', '\$ 86.50', isTotal: true),
+                    _buildSummaryRow('Total', 'Rp 86.500', isTotal: true),
                   ],
                 ),
               ),
@@ -166,7 +166,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
             child: const Text(
-              'Pay Now (\$ 86.50)',
+              'Pay Now (Rp 86.500)',
               style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),

@@ -12,6 +12,11 @@ class Product {
   final int reviews;
   final String? sellerId;
   final String? sellerName;
+  final String? location;
+  final bool isDealOfTheDay;
+  final bool isTrending;
+  final bool isNewArrival;
+  final int stock;
 
   Product({
     this.id,
@@ -25,6 +30,11 @@ class Product {
     this.reviews = 0,
     this.sellerId,
     this.sellerName,
+    this.location,
+    this.isDealOfTheDay = false,
+    this.isTrending = false,
+    this.isNewArrival = false,
+    this.stock = 0,
   });
 
   factory Product.fromFirestore(DocumentSnapshot doc) {
@@ -41,6 +51,11 @@ class Product {
       reviews: data['reviews'] ?? 0,
       sellerId: data['sellerId'] as String?,
       sellerName: data['sellerName'] as String?,
+      location: data['location'] as String?,
+      isDealOfTheDay: data['isDealOfTheDay'] ?? false,
+      isTrending: data['isTrending'] ?? false,
+      isNewArrival: data['isNewArrival'] ?? false,
+      stock: data['stock'] != null ? (data['stock'] as num).toInt() : 0,
     );
   }
 
@@ -56,6 +71,11 @@ class Product {
       'reviews': reviews,
       'sellerId': sellerId,
       'sellerName': sellerName,
+      'location': location,
+      'isDealOfTheDay': isDealOfTheDay,
+      'isTrending': isTrending,
+      'isNewArrival': isNewArrival,
+      'stock': stock,
     };
   }
 }

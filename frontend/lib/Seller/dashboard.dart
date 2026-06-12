@@ -691,7 +691,7 @@ class _SellerDashboardState extends State<SellerDashboard> {
                                                     ),
                                                   ),
                                                   Text(
-                                                    '₹${amount.toStringAsFixed(0)}',
+                                                    'Rp ${amount.toStringAsFixed(0)}',
                                                     style: TextStyle(
                                                       fontFamily: 'Montserrat',
                                                       fontWeight: FontWeight.bold,

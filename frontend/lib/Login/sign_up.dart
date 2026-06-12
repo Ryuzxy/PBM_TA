@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'sign_in.dart';
+import '../Buyer/dashboard/dashboard.dart';
+import '../Admin/admin_dashboard.dart';
+import '../Services/auth_service.dart';
 
 class SignUp extends StatefulWidget {
   const SignUp({super.key});
@@ -14,6 +18,9 @@ class _SignUpState extends State<SignUp> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  final AuthService _authService = AuthService();
 
   Future<void> _handleSignUp() async {
     final email = _emailController.text.trim();
@@ -23,6 +30,13 @@ class _SignUpState extends State<SignUp> {
     if (email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all fields')),
+      );
+      return;
+    }
+
+    if (email.toLowerCase().endsWith('@admin.com')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Admin email registration is not allowed. Please contact the administrator.')),
       );
       return;
     }
@@ -39,10 +53,24 @@ class _SignUpState extends State<SignUp> {
     });
 
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      if (userCredential.user != null) {
+        final uId = userCredential.user!.uid;
+        const role = 'buyer'; // Always default to buyer on signup
+
+        await FirebaseFirestore.instance.collection('users').doc(uId).set({
+          'uid': uId,
+          'email': email,
+          'role': role,
+          'createdAt': FieldValue.serverTimestamp(),
+          'accountHolder': email.split('@')[0],
+        });
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Account created successfully! Please log in.')),
@@ -56,6 +84,73 @@ class _SignUpState extends State<SignUp> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.message ?? 'An error occurred during sign up')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleGoogleSignUp() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final userCredential = await _authService.signInWithGoogle();
+      if (userCredential != null && userCredential.user != null) {
+        final user = userCredential.user!;
+        final uId = user.uid;
+        final email = user.email ?? '';
+
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(uId).get();
+        if (!userDoc.exists) {
+          if (email.toLowerCase().endsWith('@admin.com')) {
+            // Block admin auto-creation via Google signup
+            await FirebaseAuth.instance.signOut();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Admin Google account must be registered by an administrator.')),
+              );
+            }
+            return;
+          }
+
+          await FirebaseFirestore.instance.collection('users').doc(uId).set({
+            'uid': uId,
+            'email': email,
+            'role': 'buyer',
+            'createdAt': FieldValue.serverTimestamp(),
+            'accountHolder': user.displayName ?? email.split('@')[0],
+            'photoUrl': user.photoURL ?? '',
+          });
+        }
+
+        final finalDoc = await FirebaseFirestore.instance.collection('users').doc(uId).get();
+        final finalRole = finalDoc.data()?['role'] as String? ?? 'buyer';
+
+        if (mounted) {
+          if (finalRole == 'admin') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const AdminDashboard()),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const DashboardScreen()),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Google Sign-In failed: $e')),
         );
       }
     } finally {
@@ -127,7 +222,7 @@ class _SignUpState extends State<SignUp> {
               const SizedBox(height: 20),
               TextField(
                 controller: _passwordController,
-                obscureText: true,
+                obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: const Color(0xFFF3F3F3),
@@ -139,7 +234,19 @@ class _SignUpState extends State<SignUp> {
                     fontWeight: FontWeight.w500,
                   ),
                   prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF676767)),
-                  suffixIcon: const Icon(Icons.visibility_off_outlined, color: Color(0xFF676767)),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: const Color(0xFF676767),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(color: Color(0xFFA8A8A9)),
@@ -158,7 +265,7 @@ class _SignUpState extends State<SignUp> {
               const SizedBox(height: 20),
               TextField(
                 controller: _confirmPasswordController,
-                obscureText: true,
+                obscureText: _obscureConfirmPassword,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: const Color(0xFFF3F3F3),
@@ -170,7 +277,19 @@ class _SignUpState extends State<SignUp> {
                     fontWeight: FontWeight.w500,
                   ),
                   prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF676767)),
-                  suffixIcon: const Icon(Icons.visibility_off_outlined, color: Color(0xFF676767)),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureConfirmPassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: const Color(0xFF676767),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscureConfirmPassword = !_obscureConfirmPassword;
+                      });
+                    },
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(color: Color(0xFFA8A8A9)),
@@ -266,7 +385,10 @@ class _SignUpState extends State<SignUp> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _buildSocialButton(Icons.g_mobiledata), // Placeholder for Google
+                  _buildSocialButton(
+                    Icons.g_mobiledata,
+                    onTap: _isLoading ? null : _handleGoogleSignUp,
+                  ), // Placeholder for Google
                   const SizedBox(width: 20),
                   _buildSocialButton(Icons.apple), // Placeholder for Apple
                   const SizedBox(width: 20),
@@ -313,17 +435,20 @@ class _SignUpState extends State<SignUp> {
     );
   }
 
-  Widget _buildSocialButton(IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: ShapeDecoration(
-        color: const Color(0xFFFBF3F5),
-        shape: RoundedRectangleBorder(
-          side: const BorderSide(width: 1, color: Color(0xFFF73658)),
-          borderRadius: BorderRadius.circular(50),
+  Widget _buildSocialButton(IconData icon, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(15),
+        decoration: ShapeDecoration(
+          color: const Color(0xFFFBF3F5),
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(width: 1, color: Color(0xFFF73658)),
+            borderRadius: BorderRadius.circular(50),
+          ),
         ),
+        child: Icon(icon, color: const Color(0xFFF73658), size: 24),
       ),
-      child: Icon(icon, color: const Color(0xFFF73658), size: 24),
     );
   }
 }

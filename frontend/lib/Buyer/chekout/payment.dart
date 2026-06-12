@@ -1,18 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../Services/theme_manager.dart';
-import 'sucessfull.dart';
-import 'confirm.dart';
+import '../../Models/product.dart';
+// import 'sucessfull.dart';
+// import 'confirm.dart';
+import '../dashboard/tracking.dart';
+import '../dashboard/qr_scanner.dart';
 
 class PaymentScreen extends StatefulWidget {
   final double orderAmount;
   final double shippingAmount;
   final double totalAmount;
+  final String? sellerId;
+  final Product? directProduct;
+  final int? directQuantity;
 
   const PaymentScreen({
     super.key,
-    this.orderAmount = 7000.0,
-    this.shippingAmount = 30.0,
-    this.totalAmount = 7030.0,
+    this.orderAmount = 70000.0,
+    this.shippingAmount = 15000.0,
+    this.totalAmount = 85000.0,
+    this.sellerId,
+    this.directProduct,
+    this.directQuantity,
   });
 
   @override
@@ -21,6 +32,325 @@ class PaymentScreen extends StatefulWidget {
 
 class _PaymentScreenState extends State<PaymentScreen> {
   String _selectedMethod = 'visa';
+  bool _isProcessingPayment = false;
+
+  // ── Logika Tombol Continue (Pengecekan Pembayaran) ───────────────────────
+  Future<void> _handlePayment(Color accentColor, Color cardColor, Color textColor) async {
+    // 1. JIKA COD (Langsung Sukses)
+    if (_selectedMethod == 'cod') {
+      final orderId = await _processOrderToDatabase(); // Panggil fungsi simpan database
+      if (mounted && orderId != null) {
+        _showSuccessDialog(context, accentColor, cardColor, textColor, orderId);
+      }
+      return;
+    }
+
+    // 2. JIKA QRIS (Buka Kamera Dulu, Baru Verifikasi)
+    if (_selectedMethod == 'qris') {
+      final scannedCode = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const QRScannerScreen()),
+      );
+      if (scannedCode == null) return; 
+    }
+
+    // 3. PROSES VERIFIKASI (Untuk QRIS dan Kartu Debit/Kredit)
+    setState(() => _isProcessingPayment = true);
+    
+    // Pura-pura menghubungi backend server (Midtrans/dll) selama 3 detik
+    await Future.delayed(const Duration(seconds: 3));
+
+    // Simpan ke database setelah pembayaran berhasil
+    final orderId = await _processOrderToDatabase();
+    
+    if (mounted) {
+      setState(() => _isProcessingPayment = false);
+      if (orderId != null) {
+        _showSuccessDialog(context, accentColor, cardColor, textColor, orderId);
+      }
+    }
+  }
+
+  // --- FUNGSI BARU UNTUK MENYIMPAN DATA KE FIRESTORE ---
+  Future<String?> _processOrderToDatabase() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+
+    // Buat ID Pesanan unik (contoh: SD-84729)
+    final String orderId = 'SD-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+
+    try {
+      final deliveryHour = (DateTime.now().hour + 1) % 24;
+      final estimatedTime = '${deliveryHour.toString().padLeft(2, '0')}:45';
+      final estimatedDeliveryText = 'Today, $estimatedTime';
+
+      // 1. Get the buyer's account details (for name, address, and coordinates)
+      String buyerName = 'SmartDrop Customer';
+      String buyerAddress = '';
+      double buyerLat = -8.1718; // Default fallback
+      double buyerLng = 113.7005; // Default fallback
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (userDoc.exists && userDoc.data() != null) {
+        buyerName = userDoc.data()?['accountHolder'] as String? ?? buyerName;
+        buyerAddress = userDoc.data()?['address'] as String? ?? buyerAddress;
+        buyerLat = (userDoc.data()?['lat'] as num?)?.toDouble() ?? buyerLat;
+        buyerLng = (userDoc.data()?['lng'] as num?)?.toDouble() ?? buyerLng;
+      }
+
+      // 2. Fetch all items in the user's cart
+      final cartSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('cart')
+          .get();
+
+      final List<Map<String, dynamic>> itemsList = [];
+      String? orderSellerId = widget.sellerId;
+      
+      for (var doc in cartSnap.docs) {
+        final cartData = doc.data();
+        final productId = cartData['productId'] as String?;
+        final quantity = (cartData['quantity'] as num?)?.toInt() ?? 1;
+        final title = cartData['title'] as String? ?? 'Product';
+        final price = (cartData['price'] as num?)?.toDouble() ?? 0.0;
+        final imageUrl = cartData['imageUrl'] as String? ?? '';
+        final sellerId = cartData['sellerId'] as String?;
+
+        if (sellerId != null && sellerId.isNotEmpty) {
+          orderSellerId ??= sellerId;
+        }
+
+        itemsList.add({
+          'productId': productId,
+          'quantity': quantity,
+          'title': title,
+          'price': price,
+          'imageUrl': imageUrl,
+          'sellerId': sellerId,
+        });
+
+        // 3. Decrement product stock in products collection
+        if (productId != null && productId.isNotEmpty) {
+          final productRef = FirebaseFirestore.instance.collection('products').doc(productId);
+          final productSnap = await productRef.get();
+          if (productSnap.exists && productSnap.data() != null) {
+            final productData = productSnap.data()!;
+            final stockKey = productData.containsKey('stock')
+                ? 'stock'
+                : (productData.containsKey('quantity') ? 'quantity' : 'stock');
+            
+            final currentStock = productData[stockKey] as num?;
+            if (currentStock != null) {
+              final newStock = (currentStock.toInt() - quantity).clamp(0, currentStock.toInt());
+              await productRef.update({stockKey: newStock});
+            }
+          }
+        }
+      }
+
+      // If cart is empty and direct product is provided (Buy Now flow)
+      if (itemsList.isEmpty && widget.directProduct != null) {
+        final product = widget.directProduct!;
+        final qty = widget.directQuantity ?? 1;
+        orderSellerId ??= product.sellerId;
+
+        itemsList.add({
+          'productId': product.id,
+          'quantity': qty,
+          'title': product.title,
+          'price': product.price,
+          'imageUrl': product.imageUrl,
+          'sellerId': product.sellerId,
+        });
+
+        // Decrement product stock in products collection
+        if (product.id != null && product.id!.isNotEmpty) {
+          final productRef = FirebaseFirestore.instance.collection('products').doc(product.id);
+          final productSnap = await productRef.get();
+          if (productSnap.exists && productSnap.data() != null) {
+            final productData = productSnap.data()!;
+            final stockKey = productData.containsKey('stock')
+                ? 'stock'
+                : (productData.containsKey('quantity') ? 'quantity' : 'stock');
+            
+            final currentStock = productData[stockKey] as num?;
+            if (currentStock != null) {
+              final newStock = (currentStock.toInt() - qty).clamp(0, currentStock.toInt());
+              await productRef.update({stockKey: newStock});
+            }
+          }
+        }
+      }
+
+      // 4. Get seller storefront coordinates and address if available
+      orderSellerId ??= user.uid;
+
+      double sellerStoreLat = -8.1643; 
+      double sellerStoreLng = 113.7169;
+      String sellerAddress = 'Official Store';
+      if (orderSellerId.isNotEmpty) {
+        try {
+          final sellerDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(orderSellerId)
+              .get();
+          if (sellerDoc.exists && sellerDoc.data() != null) {
+            final sLat = (sellerDoc.data()?['lat'] as num?)?.toDouble();
+            final sLng = (sellerDoc.data()?['lng'] as num?)?.toDouble();
+            if (sLat != null && sLng != null) {
+              sellerStoreLat = sLat;
+              sellerStoreLng = sLng;
+            }
+            final sAddress = sellerDoc.data()?['address'] as String?;
+            if (sAddress != null && sAddress.isNotEmpty) {
+              sellerAddress = sAddress;
+            }
+          }
+        } catch (e) {
+          debugPrint('Error fetching seller coordinates: $e');
+        }
+      }
+
+      // 5. Simpan ke Riwayat Pesanan Pembeli (Muncul di My Orders)
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('orders')
+          .doc(orderId)
+          .set({
+        'orderId': orderId,
+        'status': 2, // 2 = In Transit (Langsung masuk tahap pengiriman)
+        'totalAmount': widget.totalAmount,
+        'estimatedDelivery': estimatedDeliveryText,
+        'createdAt': FieldValue.serverTimestamp(),
+        'sellerId': orderSellerId,
+        'buyerAddress': buyerAddress,
+        'sellerAddress': sellerAddress,
+      });
+
+      // 6. Simpan ke Sistem Tracking Global (Agar Seller Panel bisa mendeteksi)
+      await FirebaseFirestore.instance.collection('tracking').doc(orderId).set({
+        'orderId': orderId,
+        'buyerId': user.uid,
+        'buyerName': buyerName,
+        'buyerAddress': buyerAddress,
+        'sellerId': orderSellerId, 
+        'status': 2,
+        'totalAmount': widget.totalAmount,
+        'storeLatitude': sellerStoreLat,
+        'storeLongitude': sellerStoreLng,
+        'buyerLatitude': buyerLat,
+        'buyerLongitude': buyerLng,
+        'sellerLatitude': sellerStoreLat, // Posisi awal kurir sama dengan lokasi toko
+        'sellerLongitude': sellerStoreLng,
+        'sellerAddress': sellerAddress,
+        'items': itemsList,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // 7. Clear user's cart after successful checkout
+      for (var doc in cartSnap.docs) {
+        await doc.reference.delete();
+      }
+
+      return orderId;
+    } catch (e) {
+      debugPrint('Gagal menyimpan pesanan: $e');
+      return null;
+    }
+  }
+
+  void _showSuccessDialog(BuildContext context, Color accentColor, Color cardColor, Color textColor, String orderId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: cardColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              CircleAvatar(
+                radius: 36,
+                backgroundColor: Colors.green.withOpacity(0.12),
+                child: const Icon(Icons.check_circle, color: Colors.green, size: 48),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Payment Successful!',
+                style: TextStyle(
+                  color: textColor,
+                  fontFamily: 'Montserrat',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Your order #$orderId has been placed successfully and is now in transit.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: textColor.withOpacity(0.7),
+                  fontFamily: 'Montserrat',
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context); // pop dialog
+                    Navigator.pop(context); // pop payment screen
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TrackingScreen(
+                          orderId: orderId,
+                          totalAmount: widget.totalAmount,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.delivery_dining, color: Colors.white),
+                  label: const Text(
+                    'Track Live Delivery',
+                    style: TextStyle(
+                      fontFamily: 'Montserrat',
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context); // pop dialog
+                  Navigator.pop(context); // pop payment screen
+                },
+                child: Text(
+                  'Back to Home',
+                  style: TextStyle(
+                    color: textColor.withOpacity(0.6),
+                    fontFamily: 'Montserrat',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -162,7 +492,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
                   // QR Code
                   _buildPaymentCard(
-                    id: 'qr',
+                    id: 'qris',
                     logoWidget: _buildQRLogo(textColor),
                     cardNumber: 'Scan QR to Pay',
                     accentColor: accentColor,
@@ -177,31 +507,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     width: double.infinity,
                     height: 59,
                     child: ElevatedButton(
-                      onPressed: () {
-                        if (_selectedMethod == 'qr') {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ConfirmScreen(
-                                orderAmount: widget.orderAmount,
-                                shippingAmount: widget.shippingAmount,
-                                totalAmount: widget.totalAmount,
-                              ),
-                            ),
-                          );
-                        } else {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => SuccessfulScreen(
-                                orderAmount: widget.orderAmount,
-                                shippingAmount: widget.shippingAmount,
-                                totalAmount: widget.totalAmount,
-                              ),
-                            ),
-                          );
-                        }
-                      },
+                      onPressed: _isProcessingPayment 
+                          ? null 
+                          : () => _handlePayment(accentColor, cardColor, textColor),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: accentColor,
                         foregroundColor: Colors.white,
@@ -210,15 +518,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         ),
                         elevation: 0,
                       ),
-                      child: const Text(
-                        'Continue',
-                        style: TextStyle(
-                          fontFamily: 'Montserrat',
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                          letterSpacing: -0.41,
-                        ),
-                      ),
+                      child: _isProcessingPayment
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              'Continue',
+                              style: TextStyle(
+                                fontFamily: 'Montserrat',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 20,
+                                letterSpacing: -0.41,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -243,24 +553,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
             fontSize: 18,
           ),
         ),
-        Row(
-          children: [
-            Icon(
-              Icons.currency_rupee,
-              size: 16,
-              color: color,
-            ),
-            const SizedBox(width: 2),
-            Text(
-              amount.toStringAsFixed(0),
-              style: TextStyle(
-                color: color,
-                fontFamily: 'Montserrat',
-                fontWeight: isTotal ? FontWeight.w600 : FontWeight.w500,
-                fontSize: 18,
-              ),
-            ),
-          ],
+        Text(
+          'Rp ${amount.toStringAsFixed(0)}',
+          style: TextStyle(
+            color: color,
+            fontFamily: 'Montserrat',
+            fontWeight: isTotal ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 18,
+          ),
         ),
       ],
     );
@@ -428,7 +728,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         const Icon(Icons.qr_code_scanner, color: Colors.blue, size: 24),
         const SizedBox(width: 8),
         Text(
-          'QR Code / UPI',
+          'QRIS',
           style: TextStyle(
             fontFamily: 'Montserrat',
             fontWeight: FontWeight.bold,

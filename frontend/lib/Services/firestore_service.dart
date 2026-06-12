@@ -57,4 +57,56 @@ class FirestoreService {
         .map((snapshot) =>
             snapshot.docs.map((doc) => BannerModel.fromFirestore(doc)).toList());
   }
+
+  // ───────────────────── Marketing Queries & CRUD ─────────────────────
+  Stream<List<Product>> getDealProducts() {
+    return _db
+        .collection('products')
+        .where('isDealOfTheDay', isEqualTo: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Product.fromFirestore(doc)).toList());
+  }
+
+  Stream<List<Product>> getTrendingProducts() {
+    return _db
+        .collection('products')
+        .where('isTrending', isEqualTo: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Product.fromFirestore(doc)).toList());
+  }
+
+  Stream<List<Product>> getNewArrivalProducts() {
+    return _db
+        .collection('products')
+        .where('isNewArrival', isEqualTo: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Product.fromFirestore(doc)).toList());
+  }
+
+  Future<void> toggleProductFlag(String productId, String fieldName, bool value) async {
+    await _db.collection('products').doc(productId).update({fieldName: value});
+  }
+
+  Future<void> addBanner(BannerModel banner) async {
+    await _db.collection('banners').add(banner.toMap());
+  }
+
+  Future<void> updateBanner(BannerModel banner) async {
+    await _db.collection('banners').doc(banner.id).update(banner.toMap());
+  }
+
+  Future<void> deleteBanner(String id) async {
+    await _db.collection('banners').doc(id).delete();
+  }
+
+  Stream<DocumentSnapshot> getSettings(String docName) {
+    return _db.collection('settings').doc(docName).snapshots();
+  }
+
+  Future<void> updateSettings(String docName, Map<String, dynamic> data) async {
+    await _db.collection('settings').doc(docName).set(data, SetOptions(merge: true));
+  }
 }

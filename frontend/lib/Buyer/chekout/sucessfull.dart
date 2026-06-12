@@ -11,9 +11,9 @@ class SuccessfulScreen extends StatefulWidget {
 
   const SuccessfulScreen({
     super.key,
-    this.orderAmount = 7000.0,
-    this.shippingAmount = 30.0,
-    this.totalAmount = 7030.0,
+    this.orderAmount = 70000.0,
+    this.shippingAmount = 15000.0,
+    this.totalAmount = 85000.0,
   });
 
   @override
@@ -75,7 +75,6 @@ class _SuccessfulScreenState extends State<SuccessfulScreen> {
           if (sellerId != null && sellerId.isNotEmpty) {
             orderSellerId ??= sellerId;
           }
-
           itemsList.add({
             'productId': productId,
             'quantity': quantity,
@@ -111,10 +110,10 @@ class _SuccessfulScreenState extends State<SuccessfulScreen> {
             }
           }
         }
-
         // 4.5. Get seller storefront coordinates if available
         double sellerStoreLat = -6.2088; // Default fallback
         double sellerStoreLng = 106.8456; // Default fallback
+        String sellerAddress = 'Official Store';
         if (orderSellerId != null && orderSellerId.isNotEmpty) {
           try {
             final sellerDoc = await FirebaseFirestore.instance
@@ -127,6 +126,10 @@ class _SuccessfulScreenState extends State<SuccessfulScreen> {
               if (sLat != null && sLng != null) {
                 sellerStoreLat = sLat;
                 sellerStoreLng = sLng;
+              }
+              final sAddress = sellerDoc.data()?['address'] as String?;
+              if (sAddress != null && sAddress.isNotEmpty) {
+                sellerAddress = sAddress;
               }
             }
           } catch (e) {
@@ -149,6 +152,8 @@ class _SuccessfulScreenState extends State<SuccessfulScreen> {
           'estimatedDelivery': estimatedDeliveryText,
           'createdAt': FieldValue.serverTimestamp(),
           'sellerId': orderSellerId,
+          'buyerAddress': buyerAddress,
+          'sellerAddress': sellerAddress,
         });
 
         // 5. Save to the new dedicated ROOT-LEVEL 'tracking' collection
@@ -174,6 +179,7 @@ class _SuccessfulScreenState extends State<SuccessfulScreen> {
           'buyerLatitude': buyerLat,
           'buyerLongitude': buyerLng,
           'sellerId': orderSellerId,
+          'sellerAddress': sellerAddress,
         });
 
         // 6. Clear user's cart after successful checkout
@@ -438,7 +444,7 @@ class _SuccessfulScreenState extends State<SuccessfulScreen> {
                               children: [
                                 const Icon(Icons.qr_code_scanner, color: Colors.blue, size: 24),
                                 const SizedBox(width: 8),
-                                Text('QR Code / UPI', style: TextStyle(fontFamily: 'Montserrat', fontWeight: FontWeight.bold, fontSize: 16, color: textColor)),
+                                Text('QRIS', style: TextStyle(fontFamily: 'Montserrat', fontWeight: FontWeight.bold, fontSize: 16, color: textColor)),
                               ],
                             ),
                             cardNumber: 'Scan QR to Pay',
@@ -595,24 +601,14 @@ class _SuccessfulScreenState extends State<SuccessfulScreen> {
             fontSize: 18,
           ),
         ),
-        Row(
-          children: [
-            Icon(
-              Icons.currency_rupee,
-              size: 16,
-              color: color,
-            ),
-            const SizedBox(width: 2),
-            Text(
-              amount.toStringAsFixed(0),
-              style: TextStyle(
-                color: color,
-                fontFamily: 'Montserrat',
-                fontWeight: isTotal ? FontWeight.w600 : FontWeight.w500,
-                fontSize: 18,
-              ),
-            ),
-          ],
+        Text(
+          'Rp ${amount.toStringAsFixed(0)}',
+          style: TextStyle(
+            color: color,
+            fontFamily: 'Montserrat',
+            fontWeight: isTotal ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 18,
+          ),
         ),
       ],
     );

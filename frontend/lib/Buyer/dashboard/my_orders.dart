@@ -208,7 +208,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          '₹${totalAmount.toStringAsFixed(0)}',
+                                          'Rp ${totalAmount.toStringAsFixed(0)}',
                                           style: TextStyle(
                                             color: accentColor,
                                             fontWeight: FontWeight.bold,

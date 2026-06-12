@@ -21,13 +21,42 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   int _quantity = 1;
   bool _isWishlisted = false;
   bool _isAddingToCart = false;
+  String _sellerLocation = 'Official Store';
 
   final List<String> _availableSizes = ['6 UK', '7 UK', '8 UK', '9 UK', '10 UK', '11 UK'];
 
   @override
   void initState() {
     super.initState();
+    _sellerLocation = (widget.product.location != null && widget.product.location!.isNotEmpty)
+        ? widget.product.location!
+        : 'Official Store';
     _checkWishlistStatus();
+    _loadSellerLocation();
+  }
+
+  Future<void> _loadSellerLocation() async {
+    final sellerId = widget.product.sellerId;
+    if (sellerId != null && sellerId.isNotEmpty) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(sellerId).get();
+        if (doc.exists && doc.data() != null) {
+          final data = doc.data()!;
+          final city = data['city'] as String? ?? '';
+          final state = data['state'] as String? ?? '';
+          if (city.isNotEmpty) {
+            setState(() {
+              _sellerLocation = city;
+              if (state.isNotEmpty) {
+                _sellerLocation = '$city, $state';
+              }
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading seller location: $e');
+      }
+    }
   }
 
   Future<void> _checkWishlistStatus() async {
@@ -66,6 +95,15 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   }
 
   Future<void> _addToCart(BuildContext context, Color accentColor) async {
+    if (widget.product.stock <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Produk ini sudah habis (Sold Out)'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
+    }
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -134,14 +172,26 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   }
 
   void _goToPayment(BuildContext context) {
+    if (widget.product.stock <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Produk ini sudah habis (Sold Out)'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
+    }
     final total = widget.product.price * _quantity;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PaymentScreen(
           orderAmount: total,
-          shippingAmount: 30.0,
-          totalAmount: total + 30.0,
+          shippingAmount: 15000.0,
+          totalAmount: total + 15000.0,
+          sellerId: widget.product.sellerId,
+          directProduct: widget.product,
+          directQuantity: _quantity,
         ),
       ),
     );
@@ -235,6 +285,31 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                               itemBuilder: (_, i) => _buildProductImage(images[i], cardColor),
                             )
                           : _buildProductImage('', cardColor),
+                      // SOLD OUT overlay
+                      if (widget.product.stock <= 0)
+                        Positioned.fill(
+                          child: Container(
+                            color: Colors.black.withValues(alpha: 0.5),
+                            alignment: Alignment.center,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade700,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text(
+                                'SOLD OUT',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontFamily: 'Montserrat',
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 22,
+                                  letterSpacing: 2,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       // Dot indicators
                       if (images.length > 1)
                         Positioned(
@@ -331,6 +406,40 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                       ),
                                     ],
                                   ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.location_on_outlined, size: 14, color: accentColor),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Lokasi: $_sellerLocation',
+                                        style: TextStyle(
+                                          color: subTextColor,
+                                          fontFamily: 'Montserrat',
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.inventory_2_outlined, size: 14, color: widget.product.stock <= 0 ? Colors.red : accentColor),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        widget.product.stock <= 0
+                                            ? 'Stok Habis (Sold Out)'
+                                            : 'Stok Tersedia: ${widget.product.stock}',
+                                        style: TextStyle(
+                                          color: widget.product.stock <= 0 ? Colors.red : subTextColor,
+                                          fontFamily: 'Montserrat',
+                                          fontWeight: widget.product.stock <= 0 ? FontWeight.bold : FontWeight.w600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                   const SizedBox(height: 8),
                                   Text(
                                     widget.product.description.isNotEmpty
@@ -354,7 +463,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         Row(
                           children: [
                             Text(
-                              '₹${widget.product.price.toStringAsFixed(0)}',
+                              'Rp ${widget.product.price.toStringAsFixed(0)}',
                               style: TextStyle(
                                 color: accentColor,
                                 fontFamily: 'Montserrat',
@@ -365,7 +474,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                             if (widget.product.oldPrice != null) ...[
                               const SizedBox(width: 12),
                               Text(
-                                '₹${widget.product.oldPrice!.toStringAsFixed(0)}',
+                                'Rp ${widget.product.oldPrice!.toStringAsFixed(0)}',
                                 style: TextStyle(
                                   color: subTextColor,
                                   fontFamily: 'Montserrat',
@@ -481,7 +590,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                 ),
                               ),
                             ),
-                            _qtyButton(Icons.add, () => setState(() => _quantity++), cardColor, accentColor),
+                            _qtyButton(Icons.add, () {
+                              if (widget.product.stock > 0 && _quantity < widget.product.stock) {
+                                setState(() => _quantity++);
+                              }
+                            }, cardColor, accentColor),
                           ],
                         ),
 
@@ -538,27 +651,34 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   // Add to Cart
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _isAddingToCart
+                      onPressed: widget.product.stock <= 0
                           ? null
-                          : () => _addToCart(context, accentColor),
-                      icon: _isAddingToCart
-                          ? SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(color: accentColor, strokeWidth: 2),
-                            )
-                          : Icon(Icons.shopping_cart_outlined, size: 18, color: accentColor),
+                          : (_isAddingToCart
+                              ? null
+                              : () => _addToCart(context, accentColor)),
+                      icon: widget.product.stock <= 0
+                          ? Icon(Icons.block, size: 18, color: Colors.grey.shade400)
+                          : (_isAddingToCart
+                              ? SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(color: accentColor, strokeWidth: 2),
+                                )
+                              : Icon(Icons.shopping_cart_outlined, size: 18, color: accentColor)),
                       label: Text(
-                        'Add to Cart',
+                        widget.product.stock <= 0 ? 'Sold Out' : 'Add to Cart',
                         style: TextStyle(
                           fontFamily: 'Montserrat',
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
-                          color: accentColor,
+                          color: widget.product.stock <= 0 ? Colors.grey.shade400 : accentColor,
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: accentColor, width: 1.5),
+                        side: BorderSide(
+                          color: widget.product.stock <= 0 ? Colors.grey.shade300 : accentColor,
+                          width: 1.5,
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -570,11 +690,17 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   // Buy Now / Go Shop Now
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () => _goToPayment(context),
-                      icon: const Icon(Icons.flash_on_rounded, size: 18, color: Colors.white),
-                      label: const Text(
-                        'Go Shop Now',
-                        style: TextStyle(
+                      onPressed: widget.product.stock <= 0
+                          ? null
+                          : () => _goToPayment(context),
+                      icon: Icon(
+                        widget.product.stock <= 0 ? Icons.block : Icons.flash_on_rounded,
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                      label: Text(
+                        widget.product.stock <= 0 ? 'Sold Out' : 'Go Shop Now',
+                        style: const TextStyle(
                           fontFamily: 'Montserrat',
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
@@ -582,7 +708,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: accentColor,
+                        backgroundColor: widget.product.stock <= 0 ? Colors.grey : accentColor,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),

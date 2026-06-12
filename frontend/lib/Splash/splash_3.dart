@@ -86,10 +86,11 @@ class SplashScreen3 extends StatelessWidget {
                 ],
               ),
               const Spacer(flex: 2),
-              Container(
+              Image.asset(
+                'assets/public/splash_3.png',
                 width: 300,
                 height: 300,
-                color: Colors.transparent, // Placeholder for image
+                fit: BoxFit.contain,
               ),
               const Spacer(flex: 1),
               const Text(

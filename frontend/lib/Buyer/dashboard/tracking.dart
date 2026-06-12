@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart';
 import '../../Services/theme_manager.dart';
 
 class TrackingScreen extends StatefulWidget {
@@ -45,6 +46,14 @@ class _TrackingScreenState extends State<TrackingScreen> {
   // Order Details from DB
   double _dbTotalAmount = 7030.0;
   bool _showOrderItems = false;
+  String _buyerAddress = '';
+  String _sellerAddress = '';
+
+  bool _isLoadingTracking = true;
+  double _distanceInKm = 0.0;
+  bool _isSimulatingBuyer = false;
+  Timer? _buyerSimTimer;
+  StreamSubscription<Position>? _positionSubscription;
 
   // Countdown timer for ETA
   Timer? _etaTimer;
@@ -64,6 +73,127 @@ class _TrackingScreenState extends State<TrackingScreen> {
   ];
   final TextEditingController _chatInputController = TextEditingController();
 
+  void _calculateDistance() {
+    try {
+      final double distanceInMeters = Geolocator.distanceBetween(
+        _sellerLat,
+        _sellerLng,
+        _buyerLat,
+        _buyerLng,
+      );
+      setState(() {
+        _distanceInKm = distanceInMeters / 1000.0;
+        if (_orderStatus != 3) {
+          // Average courier speed 30 km/h -> 0.5 km/minute
+          _etaMinutes = (_distanceInKm / 0.5).round();
+          if (_etaMinutes < 1) _etaMinutes = 1;
+        } else {
+          _etaMinutes = 0;
+        }
+      });
+    } catch (e) {
+      debugPrint('Error calculating distance: $e');
+    }
+  }
+
+  void _startListeningToBuyerLocation() async {
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    
+    if (permission == LocationPermission.whileInUse ||
+        permission == LocationPermission.always) {
+      _positionSubscription = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 10, // Update every 10 meters
+        ),
+      ).listen((Position position) async {
+        if (mounted && !_isSimulatingBuyer) {
+          setState(() {
+            _buyerLat = position.latitude;
+            _buyerLng = position.longitude;
+          });
+          
+          try {
+            await FirebaseFirestore.instance
+                .collection('tracking')
+                .doc(widget.orderId)
+                .update({
+              'buyerLatitude': position.latitude,
+              'buyerLongitude': position.longitude,
+            });
+          } catch (e) {
+            debugPrint('Error updating buyer location in Firestore: $e');
+          }
+          
+          _calculateDistance();
+          _updateCameraBounds();
+          _fetchRoute();
+        }
+      });
+    }
+  }
+
+  void _toggleBuyerSimulation() {
+    if (_isSimulatingBuyer) {
+      _buyerSimTimer?.cancel();
+      setState(() {
+        _isSimulatingBuyer = false;
+      });
+    } else {
+      setState(() {
+        _isSimulatingBuyer = true;
+      });
+      
+      int step = 0;
+      final int totalSteps = 25;
+      final double startLat = _buyerLat;
+      final double startLng = _buyerLng;
+      
+      _buyerSimTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+        if (!mounted || !_isSimulatingBuyer) {
+          timer.cancel();
+          return;
+        }
+        
+        step++;
+        if (step >= totalSteps) {
+          timer.cancel();
+          setState(() {
+            _isSimulatingBuyer = false;
+            _buyerLat = _sellerLat;
+            _buyerLng = _sellerLng;
+          });
+        } else {
+          double t = step / totalSteps;
+          double currentLat = startLat + (_sellerLat - startLat) * t;
+          double currentLng = startLng + (_sellerLng - startLng) * t;
+          
+          setState(() {
+            _buyerLat = currentLat;
+            _buyerLng = currentLng;
+          });
+        }
+        
+        try {
+          await FirebaseFirestore.instance
+              .collection('tracking')
+              .doc(widget.orderId)
+              .update({
+            'buyerLatitude': _buyerLat,
+            'buyerLongitude': _buyerLng,
+          });
+        } catch (_) {}
+        
+        _calculateDistance();
+        _updateCameraBounds();
+        _fetchRoute();
+      });
+    }
+  }
+
   Future<void> _fetchRoute() async {
     final now = DateTime.now();
     // Rate limit: don't call more than once every 8 seconds
@@ -73,7 +203,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
     _lastRouteFetchTime = now;
 
     final url = 'https://router.project-osrm.org/route/v1/driving/'
-        '$_storeLng,$_storeLat;$_buyerLng,$_buyerLat'
+        '$_sellerLng,$_sellerLat;$_buyerLng,$_buyerLat'
         '?overview=full&geometries=geojson';
     try {
       final response = await http.get(Uri.parse(url));
@@ -103,7 +233,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
     if (mounted && _routePoints.isEmpty) {
       setState(() {
         _routePoints = [
-          LatLng(_storeLat, _storeLng),
+          LatLng(_sellerLat, _sellerLng),
           LatLng(_buyerLat, _buyerLng),
         ];
       });
@@ -112,15 +242,24 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
   void _updateCameraBounds() {
     try {
+      if (!mounted) return;
+      
+      double minLat = math.min(math.min(_sellerLat, _buyerLat), _storeLat);
+      double maxLat = math.max(math.max(_sellerLat, _buyerLat), _storeLat);
+      double minLng = math.min(math.min(_sellerLng, _buyerLng), _storeLng);
+      double maxLng = math.max(math.max(_sellerLng, _buyerLng), _storeLng);
+
+      // Add a safe margin if coordinates are too close
+      if ((maxLat - minLat).abs() < 0.001 && (maxLng - minLng).abs() < 0.001) {
+        minLat -= 0.003;
+        maxLat += 0.003;
+        minLng -= 0.003;
+        maxLng += 0.003;
+      }
+
       final bounds = LatLngBounds(
-        LatLng(
-          math.min(math.min(_sellerLat, _buyerLat), _storeLat),
-          math.min(math.min(_sellerLng, _buyerLng), _storeLng),
-        ),
-        LatLng(
-          math.max(math.max(_sellerLat, _buyerLat), _storeLat),
-          math.max(math.max(_sellerLng, _buyerLng), _storeLng),
-        ),
+        LatLng(minLat, minLng),
+        LatLng(maxLat, maxLng),
       );
       _mapController.fitCamera(
         CameraFit.bounds(
@@ -144,7 +283,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
 
     // ETA Countdown tick
     _etaTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (_etaMinutes > 1) {
+      if (_etaMinutes > 1 && !_isSimulatingBuyer) {
         if (mounted) {
           setState(() {
             _etaMinutes--;
@@ -170,6 +309,8 @@ class _TrackingScreenState extends State<TrackingScreen> {
         final storeLat = (data['storeLatitude'] as num?)?.toDouble() ?? sellerLat;
         final storeLng = (data['storeLongitude'] as num?)?.toDouble() ?? sellerLng;
         final amount = (data['totalAmount'] as num?)?.toDouble() ?? widget.totalAmount;
+        final bAddress = data['buyerAddress'] as String? ?? '';
+        final sAddress = data['sellerAddress'] as String? ?? '';
         
         if (mounted) {
           setState(() {
@@ -177,16 +318,22 @@ class _TrackingScreenState extends State<TrackingScreen> {
             _items = items;
             _sellerLat = sellerLat;
             _sellerLng = sellerLng;
-            _buyerLat = buyerLat;
-            _buyerLng = buyerLng;
+            if (!_isSimulatingBuyer) {
+              _buyerLat = buyerLat;
+              _buyerLng = buyerLng;
+            }
             _storeLat = storeLat;
             _storeLng = storeLng;
             _dbTotalAmount = amount;
+            _buyerAddress = bAddress;
+            _sellerAddress = sAddress;
+            _isLoadingTracking = false;
             if (status == 3) {
               // Delivered / Arrived
               _etaMinutes = 0;
             }
           });
+          _calculateDistance();
           _updateCameraBounds();
           _fetchRoute();
         }
@@ -195,12 +342,15 @@ class _TrackingScreenState extends State<TrackingScreen> {
       debugPrint('Error listening to tracking document: $e');
     });
 
+    _startListeningToBuyerLocation();
     _fetchRoute();
   }
 
   @override
   void dispose() {
     _etaTimer?.cancel();
+    _buyerSimTimer?.cancel();
+    _positionSubscription?.cancel();
     _chatInputController.dispose();
     _trackingSubscription?.cancel();
     _mapController.dispose();
@@ -487,6 +637,31 @@ class _TrackingScreenState extends State<TrackingScreen> {
         final accentColor = currentTheme.accentColor;
         final subTextColor = currentTheme.subTextColor;
 
+        if (_isLoadingTracking) {
+          return Scaffold(
+            backgroundColor: bgColor,
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading tracking data...',
+                    style: TextStyle(
+                      fontFamily: 'Montserrat',
+                      color: textColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
         return Scaffold(
           backgroundColor: bgColor,
           body: Stack(
@@ -629,6 +804,27 @@ class _TrackingScreenState extends State<TrackingScreen> {
                 ),
               ),
 
+              // 2.1 WALK SIMULATION BUTTON
+              Positioned(
+                top: 104,
+                left: 16,
+                child: Tooltip(
+                  message: _isSimulatingBuyer ? 'Stop Walk Simulation' : 'Simulate My Walk',
+                  child: CircleAvatar(
+                    backgroundColor: (_isSimulatingBuyer ? Colors.red : Colors.green).withOpacity(0.9),
+                    radius: 22,
+                    child: IconButton(
+                      icon: Icon(
+                        _isSimulatingBuyer ? Icons.stop : Icons.directions_walk,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      onPressed: _toggleBuyerSimulation,
+                    ),
+                  ),
+                ),
+              ),
+
               // 3. TOP INFO BOARD: ETA & Total Cash amount (Bagian Atas)
               Positioned(
                 top: 48,
@@ -672,7 +868,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                 Icon(Icons.access_time_filled, color: accentColor, size: 16),
                                 const SizedBox(width: 4),
                                 Text(
-                                  '$_etaMinutes mins',
+                                  '$_etaMinutes mins (${_distanceInKm.toStringAsFixed(1)} km)',
                                   style: TextStyle(
                                     fontFamily: 'Montserrat',
                                     fontWeight: FontWeight.w800,
@@ -713,7 +909,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                               Icon(Icons.payments, color: Colors.green, size: 16),
                               const SizedBox(width: 4),
                               Text(
-                                '₹${_dbTotalAmount.toStringAsFixed(0)}',
+                                'Rp ${_dbTotalAmount.toStringAsFixed(0)}',
                                 style: TextStyle(
                                   fontFamily: 'Montserrat',
                                   fontWeight: FontWeight.w800,
@@ -794,6 +990,54 @@ class _TrackingScreenState extends State<TrackingScreen> {
                           ),
                         ],
                       ),
+                      if (_buyerAddress.isNotEmpty || _sellerAddress.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        const Divider(height: 1, thickness: 0.5),
+                        const SizedBox(height: 10),
+                        if (_sellerAddress.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2.0),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(Icons.storefront_outlined, size: 14, color: subTextColor),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Seller: $_sellerAddress',
+                                    style: TextStyle(
+                                      fontFamily: 'Montserrat',
+                                      fontSize: 11,
+                                      color: subTextColor,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (_buyerAddress.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2.0),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(Icons.location_on_outlined, size: 14, color: accentColor),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Buyer: $_buyerAddress',
+                                    style: TextStyle(
+                                      fontFamily: 'Montserrat',
+                                      fontSize: 11,
+                                      color: textColor,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                       if (_items.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         const Divider(height: 1, thickness: 0.5),
@@ -872,7 +1116,7 @@ class _TrackingScreenState extends State<TrackingScreen> {
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            '₹${price.toStringAsFixed(0)} x $qty',
+                                            'Rp ${price.toStringAsFixed(0)} x $qty',
                                             style: TextStyle(
                                               fontFamily: 'Montserrat',
                                               fontSize: 10,

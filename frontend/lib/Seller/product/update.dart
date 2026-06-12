@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import '../../Models/product.dart';
@@ -23,6 +25,7 @@ class _UpdateProductScreenState extends State<UpdateProductScreen> {
   late TextEditingController _descriptionController;
   late TextEditingController _priceController;
   late TextEditingController _oldPriceController;
+  late TextEditingController _stockController;
 
   XFile? _pickedImage;
   bool _isLoading = false;
@@ -37,6 +40,7 @@ class _UpdateProductScreenState extends State<UpdateProductScreen> {
     _oldPriceController = TextEditingController(
       text: widget.product.oldPrice != null ? widget.product.oldPrice!.toStringAsFixed(0) : '',
     );
+    _stockController = TextEditingController(text: widget.product.stock.toString());
     _calculatedDiscount = widget.product.discount;
 
     _priceController.addListener(_calculateDiscount);
@@ -51,6 +55,7 @@ class _UpdateProductScreenState extends State<UpdateProductScreen> {
     _priceController.dispose();
     _oldPriceController.removeListener(_calculateDiscount);
     _oldPriceController.dispose();
+    _stockController.dispose();
     super.dispose();
   }
 
@@ -238,11 +243,12 @@ class _UpdateProductScreenState extends State<UpdateProductScreen> {
     final description = _descriptionController.text.trim();
     final priceStr = _priceController.text.trim();
     final oldPriceStr = _oldPriceController.text.trim();
+    final stockStr = _stockController.text.trim();
 
-    if (title.isEmpty || description.isEmpty || priceStr.isEmpty) {
+    if (title.isEmpty || description.isEmpty || priceStr.isEmpty || stockStr.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please fill all required fields (Title, Description, Price)'),
+          content: Text('Please fill all required fields (Title, Description, Price, Stock)'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -288,6 +294,33 @@ class _UpdateProductScreenState extends State<UpdateProductScreen> {
     });
 
     try {
+      String sellerLocation = widget.product.location ?? 'Official Store';
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (userDoc.exists && userDoc.data() != null) {
+          final city = userDoc.data()?['city'] as String? ?? '';
+          final state = userDoc.data()?['state'] as String? ?? '';
+          if (city.isNotEmpty) {
+            sellerLocation = city;
+            if (state.isNotEmpty) {
+              sellerLocation = '$city, $state';
+            }
+          }
+        }
+      }
+
+      final stock = int.tryParse(stockStr) ?? 0;
+      if (stock < 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a valid stock amount'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+
       final imageUrl = await _uploadImage();
       if (imageUrl == null) throw Exception('Image upload returned null');
 
@@ -303,6 +336,8 @@ class _UpdateProductScreenState extends State<UpdateProductScreen> {
         reviews: widget.product.reviews,
         sellerId: widget.product.sellerId,
         sellerName: widget.product.sellerName,
+        location: sellerLocation,
+        stock: stock,
       );
 
       await _firestoreService.updateProduct(updatedProduct);
@@ -545,7 +580,7 @@ class _UpdateProductScreenState extends State<UpdateProductScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildFieldLabel('Price (₹) *', textColor),
+                                _buildFieldLabel('Price (Rp) *', textColor),
                                 _buildTextField(
                                   controller: _priceController,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -563,7 +598,7 @@ class _UpdateProductScreenState extends State<UpdateProductScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildFieldLabel('Original Price (₹)', textColor),
+                                _buildFieldLabel('Original Price (Rp)', textColor),
                                 _buildTextField(
                                   controller: _oldPriceController,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -577,6 +612,18 @@ class _UpdateProductScreenState extends State<UpdateProductScreen> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      _buildFieldLabel('Stock *', textColor),
+                      _buildTextField(
+                        controller: _stockController,
+                        keyboardType: TextInputType.number,
+                        textColor: textColor,
+                        cardColor: cardColor,
+                        accentColor: accentColor,
+                        subTextColor: subTextColor,
+                        hintText: 'e.g. 10',
                       ),
 
                       // Live calculated discount preview

@@ -24,6 +24,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _oldPriceController = TextEditingController();
+  final TextEditingController _stockController = TextEditingController(text: '10');
 
   XFile? _pickedImage;
   bool _isLoading = false;
@@ -44,6 +45,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     _priceController.dispose();
     _oldPriceController.removeListener(_calculateDiscount);
     _oldPriceController.dispose();
+    _stockController.dispose();
     super.dispose();
   }
 
@@ -231,11 +233,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final description = _descriptionController.text.trim();
     final priceStr = _priceController.text.trim();
     final oldPriceStr = _oldPriceController.text.trim();
+    final stockStr = _stockController.text.trim();
 
-    if (title.isEmpty || description.isEmpty || priceStr.isEmpty) {
+    if (title.isEmpty || description.isEmpty || priceStr.isEmpty || stockStr.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please fill all required fields (Title, Description, Price)'),
+          content: Text('Please fill all required fields (Title, Description, Price, Stock)'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -294,14 +297,34 @@ class _AddProductScreenState extends State<AddProductScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception('No authenticated user found');
 
-      // Fetch seller name from Firestore profile
+      // Fetch seller name & location from Firestore profile
       String sellerName = 'Seller';
+      String sellerLocation = 'Official Store';
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       if (userDoc.exists && userDoc.data() != null) {
         final name = userDoc.data()?['accountHolder'] as String?;
         if (name != null && name.trim().isNotEmpty) {
           sellerName = name.trim();
         }
+        final city = userDoc.data()?['city'] as String? ?? '';
+        final state = userDoc.data()?['state'] as String? ?? '';
+        if (city.isNotEmpty) {
+          sellerLocation = city;
+          if (state.isNotEmpty) {
+            sellerLocation = '$city, $state';
+          }
+        }
+      }
+
+      final stock = int.tryParse(stockStr) ?? 0;
+      if (stock < 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a valid stock amount'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
       }
 
       final imageUrl = await _uploadImage();
@@ -318,6 +341,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
         reviews: 0,
         sellerId: user.uid,
         sellerName: sellerName,
+        location: sellerLocation,
+        stock: stock,
       );
 
       await _firestoreService.addProduct(newProduct);
@@ -545,7 +570,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildFieldLabel('Price (₹) *', textColor),
+                                _buildFieldLabel('Price (Rp) *', textColor),
                                 _buildTextField(
                                   controller: _priceController,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -563,7 +588,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildFieldLabel('Original Price (₹)', textColor),
+                                _buildFieldLabel('Original Price (Rp)', textColor),
                                 _buildTextField(
                                   controller: _oldPriceController,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -577,6 +602,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      _buildFieldLabel('Stock *', textColor),
+                      _buildTextField(
+                        controller: _stockController,
+                        keyboardType: TextInputType.number,
+                        textColor: textColor,
+                        cardColor: cardColor,
+                        accentColor: accentColor,
+                        subTextColor: subTextColor,
+                        hintText: 'e.g. 10',
                       ),
 
                       // Live calculated discount preview

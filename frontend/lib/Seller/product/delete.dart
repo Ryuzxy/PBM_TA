@@ -215,7 +215,7 @@ class _DeleteProductScreenState extends State<DeleteProductScreen> {
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
-                                        '₹${widget.product.price.toStringAsFixed(0)}',
+                                        'Rp ${widget.product.price.toStringAsFixed(0)}',
                                         style: TextStyle(
                                           fontFamily: 'Montserrat',
                                           fontWeight: FontWeight.bold,
@@ -230,7 +230,7 @@ class _DeleteProductScreenState extends State<DeleteProductScreen> {
                                     Row(
                                       children: [
                                         Text(
-                                          '₹${widget.product.oldPrice!.toStringAsFixed(0)}',
+                                          'Rp ${widget.product.oldPrice!.toStringAsFixed(0)}',
                                           style: TextStyle(
                                             fontFamily: 'Montserrat',
                                             fontSize: 12,

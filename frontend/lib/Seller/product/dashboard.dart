@@ -297,7 +297,7 @@ class _ProductDashboardState extends State<ProductDashboard> {
                                       Row(
                                         children: [
                                           Text(
-                                            '₹${product.price.toStringAsFixed(0)}',
+                                            'Rp ${product.price.toStringAsFixed(0)}',
                                             style: TextStyle(
                                               fontFamily: 'Montserrat',
                                               fontWeight: FontWeight.bold,
@@ -308,7 +308,7 @@ class _ProductDashboardState extends State<ProductDashboard> {
                                           const SizedBox(width: 6),
                                           if (product.oldPrice != null) ...[
                                             Text(
-                                              '₹${product.oldPrice!.toStringAsFixed(0)}',
+                                              'Rp ${product.oldPrice!.toStringAsFixed(0)}',
                                               style: TextStyle(
                                                 fontFamily: 'Montserrat',
                                                 fontSize: 11,
@@ -328,6 +328,22 @@ class _ProductDashboardState extends State<ProductDashboard> {
                                                 ),
                                               ),
                                           ],
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.inventory_2_outlined, size: 12, color: subTextColor),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Stock: ${product.stock}',
+                                            style: TextStyle(
+                                              fontFamily: 'Montserrat',
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: subTextColor,
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ],

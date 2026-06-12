@@ -467,7 +467,7 @@ class _SettingScreenState extends State<SettingScreen> {
                                           context,
                                           MaterialPageRoute(
                                             builder: (_) => TrackingScreen(
-                                              totalAmount: (orderData['totalAmount'] as num?)?.toDouble() ?? 7030.0,
+                                              totalAmount: (orderData['totalAmount'] as num?)?.toDouble() ?? 85000.0,
                                               orderId: orderId,
                                             ),
                                           ),
