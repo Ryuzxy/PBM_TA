@@ -75,7 +75,7 @@ SmartDrop adalah aplikasi mobile e-commerce berbasis **Flutter** dan **Firebase*
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    SmartDrop Flutter App                      │
+│                    SmartDrop Flutter App                    │
 ├───────────────┬──────────────┬──────────────┬───────────────┤
 │   Splash &    │    Buyer     │    Seller    │     Admin     │
 │   Auth        │   Module     │    Module    │    Module     │
@@ -83,10 +83,10 @@ SmartDrop adalah aplikasi mobile e-commerce berbasis **Flutter** dan **Firebase*
 │   AI Module   │   Models     │   Services                   │
 │   (Gemini)    │   (Data)     │   (Business Logic)           │
 ├─────────────────────────────────────────────────────────────┤
-│                    Firebase SDK                              │
+│                    Firebase SDK                             │
 │   firebase_auth  │  cloud_firestore  │  google_sign_in      │
 ├─────────────────────────────────────────────────────────────┤
-│                   External APIs                              │
+│                   External APIs                             │
 │   Gemini AI  │  OSRM Routing  │  CARTO Map Tiles            │
 └─────────────────────────────────────────────────────────────┘
 ```
