@@ -67,8 +67,15 @@ class SplashScreen4 extends StatelessWidget {
                     onTap: () {
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => const GetStarted(),
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) => const GetStarted(),
+                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                            return SlideTransition(
+                              position: animation.drive(Tween(begin: const Offset(0.05, 0.0), end: Offset.zero).chain(CurveTween(curve: Curves.easeInOut))),
+                              child: FadeTransition(opacity: animation, child: child),
+                            );
+                          },
+                          transitionDuration: const Duration(milliseconds: 500),
                         ),
                       );
                     },
@@ -93,7 +100,7 @@ class SplashScreen4 extends StatelessWidget {
               ),
               const Spacer(flex: 1),
               const Text(
-                'Get Your Order',
+                'Lacak Lokasi Penjual',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.black,
@@ -104,7 +111,7 @@ class SplashScreen4 extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               const Text(
-                'Amet minim mollit non deserunt ullamco est sit aliqua dolor do amet sint. Velit officia consequat duis enim velit mollit.',
+                'Pantau pergerakan penjual secara real-time pada peta interaktif dengan validasi jarak geofencing yang akurat.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Color(0xFFA8A8A9),
@@ -149,8 +156,15 @@ class SplashScreen4 extends StatelessWidget {
                     onTap: () {
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => const GetStarted(),
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) => const GetStarted(),
+                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                            return SlideTransition(
+                              position: animation.drive(Tween(begin: const Offset(0.05, 0.0), end: Offset.zero).chain(CurveTween(curve: Curves.easeInOut))),
+                              child: FadeTransition(opacity: animation, child: child),
+                            );
+                          },
+                          transitionDuration: const Duration(milliseconds: 500),
                         ),
                       );
                     },

@@ -68,8 +68,15 @@ class SplashScreen3 extends StatelessWidget {
                     onTap: () {
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => const GetStarted(),
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) => const GetStarted(),
+                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                            return SlideTransition(
+                              position: animation.drive(Tween(begin: const Offset(0.05, 0.0), end: Offset.zero).chain(CurveTween(curve: Curves.easeInOut))),
+                              child: FadeTransition(opacity: animation, child: child),
+                            );
+                          },
+                          transitionDuration: const Duration(milliseconds: 500),
                         ),
                       );
                     },
@@ -94,7 +101,7 @@ class SplashScreen3 extends StatelessWidget {
               ),
               const Spacer(flex: 1),
               const Text(
-                'Make Payment',
+                'Transaksi COD Aman',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.black,
@@ -105,7 +112,7 @@ class SplashScreen3 extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               const Text(
-                'Amet minim mollit non deserunt ullamco est sit aliqua dolor do amet sint. Velit officia consequat duis enim velit mollit.',
+                'Gunakan titik temu \'Safe Zone\' yang aman dan terverifikasi untuk melakukan pertemuan COD tanpa rasa khawatir.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Color(0xFFA8A8A9),
@@ -150,8 +157,15 @@ class SplashScreen3 extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => const SplashScreen4(),
+                        PageRouteBuilder(
+                          pageBuilder: (context, animation, secondaryAnimation) => const SplashScreen4(),
+                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                            return SlideTransition(
+                              position: animation.drive(Tween(begin: const Offset(0.05, 0.0), end: Offset.zero).chain(CurveTween(curve: Curves.easeInOut))),
+                              child: FadeTransition(opacity: animation, child: child),
+                            );
+                          },
+                          transitionDuration: const Duration(milliseconds: 500),
                         ),
                       );
                     },

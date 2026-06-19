@@ -8,6 +8,7 @@ import 'qr_scanner.dart';
 import 'tracking.dart';
 import 'my_orders.dart';
 import '../../Seller/dashboard.dart';
+import '../../AI/chat.dart';
 
 class SettingScreen extends StatefulWidget {
   const SettingScreen({super.key});
@@ -229,6 +230,218 @@ class _SettingScreenState extends State<SettingScreen> {
               const SizedBox(height: 16),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  void _showReportDialog(AppTheme theme) {
+    final targetController = TextEditingController();
+    final issueController = TextEditingController();
+    String selectedTitle = "COD Di Luar Safe Zone";
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: theme.cardColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text(
+                'Laporkan Masalah',
+                style: TextStyle(
+                  fontFamily: 'Montserrat',
+                  fontWeight: FontWeight.bold,
+                  color: theme.textColor,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Pilih Kategori Masalah:',
+                      style: TextStyle(
+                        fontFamily: 'Montserrat',
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: theme.textColor.withOpacity(0.8),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: theme.bgColor,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: theme.subTextColor.withOpacity(0.2)),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: selectedTitle,
+                          dropdownColor: theme.cardColor,
+                          style: TextStyle(color: theme.textColor, fontFamily: 'Montserrat', fontSize: 13),
+                          icon: Icon(Icons.arrow_drop_down, color: theme.textColor),
+                          isExpanded: true,
+                          items: const [
+                            DropdownMenuItem(value: "COD Di Luar Safe Zone", child: Text("COD Di Luar Safe Zone")),
+                            DropdownMenuItem(value: "Masalah GPS / Geofence", child: Text("Masalah GPS / Geofence")),
+                            DropdownMenuItem(value: "Deskripsi Produk Tidak Sesuai", child: Text("Deskripsi Produk Tidak Sesuai")),
+                            DropdownMenuItem(value: "Penipuan / Fraud", child: Text("Penipuan / Fraud")),
+                            DropdownMenuItem(value: "Lainnya", child: Text("Lainnya")),
+                          ],
+                          onChanged: isSubmitting
+                              ? null
+                              : (val) {
+                                  if (val != null) {
+                                    setDialogState(() => selectedTitle = val);
+                                  }
+                                },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Pihak / Target Dilaporkan:',
+                      style: TextStyle(
+                        fontFamily: 'Montserrat',
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: theme.textColor.withOpacity(0.8),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: targetController,
+                      style: TextStyle(color: theme.textColor, fontSize: 13, fontFamily: 'Montserrat'),
+                      decoration: InputDecoration(
+                        hintText: 'Misal: Penjual Jane, Toko A, atau Geofence',
+                        hintStyle: TextStyle(color: theme.subTextColor.withOpacity(0.5)),
+                        filled: true,
+                        fillColor: theme.bgColor,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: theme.subTextColor.withOpacity(0.2)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: theme.accentColor),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      enabled: !isSubmitting,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Detail Masalah:',
+                      style: TextStyle(
+                        fontFamily: 'Montserrat',
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: theme.textColor.withOpacity(0.8),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: issueController,
+                      maxLines: 4,
+                      style: TextStyle(color: theme.textColor, fontSize: 13, fontFamily: 'Montserrat'),
+                      decoration: InputDecoration(
+                        hintText: 'Jelaskan kronologi masalah Anda secara lengkap...',
+                        hintStyle: TextStyle(color: theme.subTextColor.withOpacity(0.5)),
+                        filled: true,
+                        fillColor: theme.bgColor,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: theme.subTextColor.withOpacity(0.2)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: theme.accentColor),
+                        ),
+                        contentPadding: const EdgeInsets.all(12),
+                      ),
+                      enabled: !isSubmitting,
+                    ),
+                    if (isSubmitting) ...[
+                      const SizedBox(height: 16),
+                      const LinearProgressIndicator(color: Colors.redAccent),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+                  child: Text('Cancel', style: TextStyle(color: theme.textColor, fontFamily: 'Montserrat')),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          final target = targetController.text.trim();
+                          final issue = issueController.text.trim();
+
+                          if (target.isEmpty || issue.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Harap lengkapi semua field laporan!'),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                            return;
+                          }
+
+                          setDialogState(() => isSubmitting = true);
+
+                          try {
+                            await FirebaseFirestore.instance.collection('reports').add({
+                              'reporter': _userName,
+                              'reporterEmail': _userEmail,
+                              'title': selectedTitle,
+                              'target': target,
+                              'issue': issue,
+                              'timestamp': FieldValue.serverTimestamp(),
+                              'status': 'Pending',
+                            });
+
+                            if (context.mounted) {
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text('Laporan berhasil dikirim ke Admin!'),
+                                  backgroundColor: theme.accentColor,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            setDialogState(() => isSubmitting = false);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Gagal mengirim laporan: $e'),
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text(
+                    'Kirim Laporan',
+                    style: TextStyle(fontFamily: 'Montserrat', fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -511,6 +724,18 @@ class _SettingScreenState extends State<SettingScreen> {
                             ),
                             Divider(height: 1, color: subTextColor.withOpacity(0.1)),
                             ListTile(
+                              leading: Icon(Icons.chat_bubble_outline_rounded, color: textColor),
+                              title: Text('Customer Service AI', style: TextStyle(color: textColor, fontFamily: 'Montserrat', fontWeight: FontWeight.w600)),
+                              trailing: Icon(Icons.arrow_forward_ios, size: 16, color: subTextColor),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const AIChatScreen()),
+                                );
+                              },
+                            ),
+                            Divider(height: 1, color: subTextColor.withOpacity(0.1)),
+                            ListTile(
                               leading: Icon(Icons.storefront_outlined, color: textColor),
                               title: Text('Seller Panel', style: TextStyle(color: textColor, fontFamily: 'Montserrat', fontWeight: FontWeight.w600)),
                               trailing: Icon(Icons.arrow_forward_ios, size: 16, color: subTextColor),
@@ -520,6 +745,13 @@ class _SettingScreenState extends State<SettingScreen> {
                                   MaterialPageRoute(builder: (context) => const SellerDashboard()),
                                 );
                               },
+                            ),
+                            Divider(height: 1, color: subTextColor.withOpacity(0.1)),
+                            ListTile(
+                              leading: Icon(Icons.report_problem_outlined, color: textColor),
+                              title: Text('Laporkan Masalah', style: TextStyle(color: textColor, fontFamily: 'Montserrat', fontWeight: FontWeight.w600)),
+                              trailing: Icon(Icons.arrow_forward_ios, size: 16, color: subTextColor),
+                              onTap: () => _showReportDialog(currentTheme),
                             ),
                             Divider(height: 1, color: subTextColor.withOpacity(0.1)),
                             ListTile(

@@ -38,25 +38,59 @@ class Product {
   });
 
   factory Product.fromFirestore(DocumentSnapshot doc) {
-    Map data = doc.data() as Map<String, dynamic>;
-    return Product(
-      id: doc.id,
-      title: data['title'] ?? '',
-      description: data['description'] ?? '',
-      price: (data['price'] ?? 0.0).toDouble(),
-      oldPrice: data['oldPrice'] != null ? data['oldPrice'].toDouble() : null,
-      discount: data['discount'] != null ? data['discount'].toDouble() : null,
-      imageUrl: data['imageUrl'] ?? '',
-      rating: (data['rating'] ?? 0.0).toDouble(),
-      reviews: data['reviews'] ?? 0,
-      sellerId: data['sellerId'] as String?,
-      sellerName: data['sellerName'] as String?,
-      location: data['location'] as String?,
-      isDealOfTheDay: data['isDealOfTheDay'] ?? false,
-      isTrending: data['isTrending'] ?? false,
-      isNewArrival: data['isNewArrival'] ?? false,
-      stock: data['stock'] != null ? (data['stock'] as num).toInt() : 0,
-    );
+    try {
+      final Map<String, dynamic> data = doc.data() as Map<String, dynamic>? ?? {};
+
+      double parseDouble(dynamic value) {
+        if (value == null) return 0.0;
+        if (value is num) return value.toDouble();
+        if (value is String) return double.tryParse(value) ?? 0.0;
+        return 0.0;
+      }
+
+      double? parseOptionalDouble(dynamic value) {
+        if (value == null) return null;
+        if (value is num) return value.toDouble();
+        if (value is String) return double.tryParse(value);
+        return null;
+      }
+
+      int parseInt(dynamic value) {
+        if (value == null) return 0;
+        if (value is num) return value.toInt();
+        if (value is String) return int.tryParse(value) ?? 0;
+        return 0;
+      }
+
+      return Product(
+        id: doc.id,
+        title: data['title']?.toString() ?? '',
+        description: data['description']?.toString() ?? '',
+        price: parseDouble(data['price']),
+        oldPrice: parseOptionalDouble(data['oldPrice']),
+        discount: parseOptionalDouble(data['discount']),
+        imageUrl: data['imageUrl']?.toString() ?? '',
+        rating: parseDouble(data['rating']),
+        reviews: parseInt(data['reviews']),
+        sellerId: data['sellerId']?.toString(),
+        sellerName: data['sellerName']?.toString(),
+        location: data['location']?.toString(),
+        isDealOfTheDay: data['isDealOfTheDay'] == true,
+        isTrending: data['isTrending'] == true,
+        isNewArrival: data['isNewArrival'] == true,
+        stock: data['stock'] != null ? parseInt(data['stock']) : 0,
+      );
+    } catch (e) {
+      return Product(
+        id: doc.id,
+        title: 'Error Loading Product',
+        description: 'Error: $e',
+        price: 0.0,
+        imageUrl: '',
+        stock: 0,
+        location: 'Unknown',
+      );
+    }
   }
 
   Map<String, dynamic> toMap() {

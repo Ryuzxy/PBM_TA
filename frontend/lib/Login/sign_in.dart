@@ -61,10 +61,19 @@ class _SignInState extends State<SignIn> {
           });
         } else {
           role = userDoc.data()?['role'] as String? ?? 'buyer';
-          // Ensure role is updated to admin if it's an @admin.com email
+          final existingEmail = userDoc.data()?['email'] as String? ?? '';
+          
+          Map<String, dynamic> updates = {};
+          if (existingEmail.isEmpty) {
+            updates['email'] = emailStr;
+          }
           if (emailStr.toLowerCase().endsWith('@admin.com') && role != 'admin') {
             role = 'admin';
-            await FirebaseFirestore.instance.collection('users').doc(uId).update({'role': 'admin'});
+            updates['role'] = 'admin';
+          }
+          
+          if (updates.isNotEmpty) {
+            await FirebaseFirestore.instance.collection('users').doc(uId).update(updates);
           }
         }
 
@@ -123,8 +132,18 @@ class _SignInState extends State<SignIn> {
           });
         } else {
           final role = userDoc.data()?['role'] as String? ?? 'buyer';
+          final existingEmail = userDoc.data()?['email'] as String? ?? '';
+          
+          Map<String, dynamic> updates = {};
+          if (existingEmail.isEmpty) {
+            updates['email'] = emailStr;
+          }
           if (emailStr.toLowerCase().endsWith('@admin.com') && role != 'admin') {
-            await FirebaseFirestore.instance.collection('users').doc(uId).update({'role': 'admin'});
+            updates['role'] = 'admin';
+          }
+          
+          if (updates.isNotEmpty) {
+            await FirebaseFirestore.instance.collection('users').doc(uId).update(updates);
           }
         }
 

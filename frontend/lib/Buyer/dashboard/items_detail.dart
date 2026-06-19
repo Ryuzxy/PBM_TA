@@ -145,6 +145,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       }
 
       if (context.mounted) {
+        final navigator = Navigator.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${widget.product.title} added to cart!'),
@@ -152,8 +153,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             action: SnackBarAction(
               label: 'View Cart',
               textColor: Colors.white,
-              onPressed: () => Navigator.push(
-                context,
+              onPressed: () => navigator.push(
                 MaterialPageRoute(builder: (_) => const CartScreen()),
               ),
             ),

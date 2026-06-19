@@ -9,37 +9,25 @@ class GetStarted extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
-          // Background Gradient
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF1A0E6E),
-                  Color(0xFF3B26B7),
-                  Color(0xFF6A52D8),
-                ],
-              ),
+          // Background Image
+          Positioned.fill(
+            child: Image.asset(
+              'assets/public/get_started_bg.png',
+              fit: BoxFit.cover,
             ),
           ),
           // Gradient Overlay
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: MediaQuery.of(context).size.height * 0.5,
+          Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withOpacity(0.0),
-                    Colors.black.withOpacity(0.63),
+                    Colors.black.withValues(alpha: 0.0),
+                    Colors.black.withValues(alpha: 0.63),
                   ],
+                  stops: const [0.4, 0.95],
                 ),
               ),
             ),
@@ -50,9 +38,9 @@ class GetStarted extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 30.0),
+                  padding: EdgeInsets.symmetric(horizontal: 37.5),
                   child: Text(
-                    'You want Authentic, here you go!',
+                    'You want Authentic Products, here you go!',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white,
@@ -60,12 +48,13 @@ class GetStarted extends StatelessWidget {
                       fontFamily: 'Montserrat',
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.34,
+                      height: 1.2,
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 17),
                 const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 30.0),
+                  padding: EdgeInsets.symmetric(horizontal: 37.5),
                   child: Text(
                     'Find it here, buy it now!',
                     textAlign: TextAlign.center,
@@ -79,22 +68,40 @@ class GetStarted extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 44),
                 GestureDetector(
                   onTap: () {
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) => const SignIn(),
+                      PageRouteBuilder(
+                        pageBuilder: (context, animation, secondaryAnimation) => const SignIn(),
+                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                          const begin = Offset(0.0, 0.05);
+                          const end = Offset.zero;
+                          const curve = Curves.easeInOut;
+
+                          final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                          final offsetAnimation = animation.drive(tween);
+
+                          return SlideTransition(
+                            position: offsetAnimation,
+                            child: FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            ),
+                          );
+                        },
+                        transitionDuration: const Duration(milliseconds: 500),
                       ),
                     );
                   },
                   child: Container(
                     width: double.infinity,
-                    margin: const EdgeInsets.symmetric(horizontal: 30.0),
-                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    height: 55,
+                    margin: const EdgeInsets.symmetric(horizontal: 55.0),
+                    alignment: Alignment.center,
                     decoration: ShapeDecoration(
-                      color: const Color(0xFFF73658),
+                      color: const Color(0xFFF83758),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(4),
                       ),
@@ -111,7 +118,7 @@ class GetStarted extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 34),
               ],
             ),
           ),
